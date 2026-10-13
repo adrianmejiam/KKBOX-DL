@@ -3,39 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KKBOX OrpheusDL FLAC Downloader</title>
+    <title>KKBOX FLAC Downloader</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700">
         <div class="flex items-center justify-between mb-2">
-            <h1 class="text-xl font-bold text-indigo-600">KKBOX OrpheusDL</h1>
-            <span class="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-0.5 rounded border border-green-400">FLAC Lossless</span>
+            <h1 class="text-xl font-bold text-indigo-400">KKBOX Downloader</h1>
+            <span class="bg-green-900 text-green-300 text-xs font-bold px-2.5 py-0.5 rounded border border-green-600">FLAC Lossless</span>
         </div>
-        <p class="text-xs text-gray-500 mb-6">Desarrollado por <a href="https://github.com/adrianmejiam" target="_blank" class="text-indigo-500 hover:underline font-semibold">adrianmejiam</a></p>
+        <p class="text-xs text-gray-400 mb-6">Desarrollado por <a href="https://github.com/adrianmejiam" target="_blank" class="text-indigo-400 hover:underline font-semibold">adrianmejiam</a></p>
 
         <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2">URL de KKBOX (Canción / Playlist / Álbum):</label>
-            <input type="text" id="url" placeholder="https://www.kkbox.com/..." class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <label class="block text-gray-300 text-sm font-bold mb-2">URL de KKBOX (Canción / Playlist / Álbum):</label>
+            <input type="text" id="url" placeholder="https://www.kkbox.com/..." class="bg-gray-900 border border-gray-700 rounded-lg w-full py-2 px-3 text-gray-200 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
 
-        <button id="downloadBtn" onclick="startDownload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg w-full transition duration-200 focus:outline-none">
+        <button id="downloadBtn" onclick="startDownload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg w-full transition duration-200 focus:outline-none shadow-md">
             Descargar FLAC en Máxima Calidad
         </button>
 
+        <!-- Contenedor de Progreso y Consola Terminal -->
         <div id="progressContainer" class="mt-6 hidden">
             <div class="flex justify-between mb-1">
-                <span id="statusText" class="text-xs font-semibold text-gray-700">Iniciando...</span>
-                <span id="percentText" class="text-xs font-semibold text-indigo-600">0%</span>
+                <span id="statusText" class="text-xs font-semibold text-gray-300">Iniciando...</span>
+                <span id="percentText" class="text-xs font-semibold text-indigo-400">0%</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-3">
-                <div id="progressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            <div class="w-full bg-gray-700 rounded-full h-3 mb-4">
+                <div id="progressBar" class="bg-indigo-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+
+            <!-- Ventana de Consola / Terminal -->
+            <div class="bg-black border border-gray-700 rounded-lg p-3 h-44 overflow-y-auto font-mono text-xs text-green-400 shadow-inner" id="consoleBox">
+                <div class="text-gray-500">$ esperando solicitud de descarga...</div>
             </div>
         </div>
     </div>
 
     <footer class="mt-8 text-center text-gray-500 text-xs">
-        Basado en <a href="https://github.com/OrfiTeam/OrpheusDL" target="_blank" class="underline">OrpheusDL</a> &amp; <a href="https://github.com/uhwot/orpheusdl-kkbox" target="_blank" class="underline">orpheusdl-kkbox</a> | Creado por <span class="font-bold text-gray-700">adrianmejiam</span>
+        Creado por <span class="font-bold text-gray-400">adrianmejiam</span> | Desplegado en Render
     </footer>
 
     <script>
@@ -46,6 +52,7 @@
             const progressBar = document.getElementById('progressBar');
             const statusText = document.getElementById('statusText');
             const percentText = document.getElementById('percentText');
+            const consoleBox = document.getElementById('consoleBox');
 
             if (!urlInput) {
                 alert("Por favor ingresa una URL válida de KKBOX.");
@@ -57,7 +64,8 @@
             progressContainer.classList.remove('hidden');
             progressBar.style.width = '0%';
             percentText.innerText = '0%';
-            statusText.innerText = 'Conectando con OrpheusDL...';
+            statusText.innerText = 'Iniciando conexión...';
+            consoleBox.innerHTML = '<div class="text-indigo-400">[+] Conectando al servidor...</div>';
 
             try {
                 const response = await fetch('/start-download', {
@@ -77,10 +85,18 @@
                         percentText.innerText = `${data.progress}%`;
                         statusText.innerText = data.status;
 
+                        // Imprimir registros en tiempo real dentro de la consola
+                        if (data.logs && data.logs.length > 0) {
+                            consoleBox.innerHTML = data.logs.map(log => `<div>${log}</div>`).join('');
+                            consoleBox.scrollTop = consoleBox.scrollHeight;
+                        }
+
                         if (data.download_url) {
                             eventSource.close();
                             btn.disabled = false;
                             btn.classList.remove('opacity-50');
+                            consoleBox.innerHTML += '<div class="text-green-300 font-bold">[✔] ¡Descarga completada! Transfiriendo archivo al navegador...</div>';
+                            consoleBox.scrollTop = consoleBox.scrollHeight;
 
                             const link = document.createElement('a');
                             link.href = data.download_url;
@@ -92,6 +108,8 @@
                             eventSource.close();
                             btn.disabled = false;
                             btn.classList.remove('opacity-50');
+                            consoleBox.innerHTML += `<div class="text-red-400 font-bold">[✖] Error: ${data.status}</div>`;
+                            consoleBox.scrollTop = consoleBox.scrollHeight;
                         }
                     };
                 }
