@@ -20,27 +20,18 @@ HTML_TEMPLATE = """
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 650px; margin: 40px auto; padding: 20px; background: #0f172a; color: #cbd5e1; }
         .card { background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); position: relative; padding-bottom: 60px; }
         h2 { margin-top: 0; color: #38bdf8; text-align: center; }
-        
-        /* Opciones de tipo de descarga */
         .options-container { display: flex; justify-content: space-between; margin: 20px 0 10px 0; gap: 10px; }
         .option-box { flex: 1; text-align: center; padding: 12px; background: #1e293b; border: 2px solid #475569; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
-        .option-box:hover { border-color: #38bdf8; background: #1e293b; }
         .option-box.active { border-color: #38bdf8; background: #0369a1; color: white; font-weight: bold; }
-        
         input[type="text"] { width: 100%; padding: 12px; margin: 15px 0; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; font-size: 14px; }
-        button { background: #0284c7; color: white; padding: 14px 20px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; font-size: 16px; transition: background 0.2s; }
+        button { background: #0284c7; color: white; padding: 14px 20px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; font-size: 16px; }
         button:hover { background: #0369a1; }
         button:disabled { background: #475569; cursor: not-allowed; }
-        
         pre { background: #090d16; color: #34d399; padding: 15px; overflow-x: auto; border-radius: 6px; min-height: 120px; font-family: 'Courier New', Courier, monospace; font-size: 13px; margin-top: 20px; }
-        .download-zone { margin-top: 20px; padding: 15px; background: #10b981; border-radius: 6px; text-align: center; display: none; animation: fadeIn 0.5s ease; }
+        .download-zone { margin-top: 20px; padding: 15px; background: #10b981; border-radius: 6px; text-align: center; display: none; }
         .download-zone a { color: white; text-decoration: none; font-weight: bold; display: block; width: 100%; font-size: 15px; }
-        
-        /* Crédito del desarrollador */
         .footer { position: absolute; bottom: 15px; right: 30px; font-size: 12px; color: #64748b; font-style: italic; }
         .footer span { color: #38bdf8; font-weight: bold; font-style: normal; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -107,7 +98,6 @@ HTML_TEMPLATE = """
                 if (data.status === "success" && data.file_url) {
                     document.getElementById('download-link').href = data.file_url;
                     dlContainer.style.display = "block";
-                    outputBox.innerText += "\\n\\n[ÉXITO] Tu descarga está empaquetada y lista para guardarse en tu dispositivo.";
                 } else {
                     outputBox.innerText += "\\n\\n[ERROR] No se pudo recuperar ningún archivo multimedia final.";
                 }
@@ -137,10 +127,9 @@ def download():
         return jsonify({"status": "error", "output": "URL no válida."}), 400
         
     try:
-        # 1. Registrar el estado del directorio antes de la descarga
         archivos_antes = set(glob.glob(os.path.join(DOWNLOAD_DIR, '**/*', '*.*'), recursive=True))
         
-        # 2. Entrar a la raíz de orpheusdl y ejecutar el binario CLI
+        # Moverse al directorio del framework base
         os.chdir('orpheusdl')
         result = subprocess.run(
             ['python', 'orpheus.py', url],
@@ -148,24 +137,20 @@ def download():
             stderr=subprocess.STDOUT,
             text=True
         )
-        os.chdir('..') # Volver a la raíz principal
+        os.chdir('..') # Regresar a la raíz
         
-        # 3. Detectar qué archivos nuevos se generaron
         archivos_despues = set(glob.glob(os.path.join(DOWNLOAD_DIR, '**/*', '*.*'), recursive=True))
         nuevos_archivos = list(archivos_despues - archivos_antes)
         
         if nuevos_archivos and result.returncode == 0:
-            # Si el usuario bajó un álbum o playlist y hay múltiples archivos, creamos un archivo comprimido .ZIP
             if len(nuevos_archivos) > 1 or mode in ['album', 'playlist']:
                 ruta_zip = os.path.join(DOWNLOAD_DIR, "pack_descarga_kkbox.zip")
                 
-                # Eliminar ZIP viejo si existe
                 if os.path.exists(ruta_zip):
                     os.remove(ruta_zip)
                     
                 with zipfile.ZipFile(ruta_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
                     for archivo in nuevos_archivos:
-                        # Evitar meter el propio archivo ZIP dentro del ZIP
                         if archivo != ruta_zip:
                             zipf.write(archivo, os.path.basename(archivo))
                             
@@ -175,7 +160,6 @@ def download():
                     "file_url": "/fetch-file/pack_descarga_kkbox.zip"
                 })
             else:
-                # Si es una sola pista, se entrega el archivo multimedia directamente
                 ruta_absoluta = max(nuevos_archivos, key=os.path.getmtime)
                 ruta_relativa = os.path.relpath(ruta_absoluta, DOWNLOAD_DIR)
                 return jsonify({
@@ -186,7 +170,7 @@ def download():
         else:
             return jsonify({
                 "status": "failed",
-                "output": result.stdout + "\n[ALERTA] El proceso terminó pero no se guardó ningún archivo nuevo en el disco."
+                "output": result.stdout + "\n[ALERTA] El proceso terminó pero no se guardó ningún archivo nuevo."
             })
             
     except Exception as e:
@@ -194,6 +178,8 @@ def download():
 
 @app.route('/fetch-file/<path:filename>', methods=['GET'])
 def fetch_file(filename):
-    """Permite la descarga directa de archivos binarios al navegador"""
     return send_from_directory(DOWNLOAD_DIR, filename, as_attachment=True)
 
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    
