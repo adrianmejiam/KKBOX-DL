@@ -2,7 +2,7 @@ services:
   - type: web
     name: kkbox-orpheus-dl
     env: python
-    buildCommand: "pip install -r requirements.txt"
+    buildCommand: "pip install -r requirements.txt && git clone https://github.com/OrfiTeam/OrpheusDL.git orpheus_base && git clone https://github.com/uhwot/orpheusdl-kkbox.git orpheus_base/modules/kkbox && pip install -r orpheus_base/requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:
       - key: PYTHON_VERSION
