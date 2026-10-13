@@ -2,16 +2,16 @@ services:
   - type: web
     name: kkbox-cloud-downloader
     env: python
-    region: sgp  # <--- Esto fuerza a Render a desplegar en Singapur (Región soportada por KKBOX)
+    region: sgp  # Despliegue en Singapur para omitir restricciones geográficas sin usar VPN
     buildCommand: ./render_setup.sh
     startCommand: gunicorn app:app
     envVars:
       - key: KKBOX_EMAIL
-        sync: false
+        value: "15cb1b133c@emailnox.live"
       - key: KKBOX_PASSWORD
-        sync: false
+        value: "Mexico_2026"
       - key: KKBOX_KC1_KEY
-        value: 7f1a68f00b747f4ac1469c72e7ef492c
+        value: "7f1a68f00b747f4ac1469c72e7ef492c"
       - key: KKBOX_SECRET_KEY
-        value: 0ff29b7c9bd8fb60a3abd6b3d402b02c
+        value: "0ff29b7c9bd8fb60a3abd6b3d402b02c"
         
