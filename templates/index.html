@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KKBOX Downloader Web</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-md w-96">
+        <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">KKBOX Downloader</h1>
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2">URL de la canción/playlist:</label>
+            <input type="text" id="url" placeholder="https://www.kkbox.com/..." class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <button onclick="sendDownload()" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded w-full focus:outline-none focus:shadow-outline">
+            Procesar / Descargar
+        </button>
+        <p id="status" class="mt-4 text-sm text-center text-gray-600"></p>
+    </div>
+
+    <script>
+        async function sendDownload() {
+            const url = document.getElementById('url').value;
+            const status = document.getElementById('status');
+            if(!url) {
+                status.innerText = "Por favor ingresa una URL válida.";
+                status.className = "mt-4 text-sm text-center text-red-500";
+                return;
+            }
+            status.innerText = "Enviando solicitud...";
+            status.className = "mt-4 text-sm text-center text-blue-500";
+            
+            const response = await fetch('/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            const result = await response.json();
+            if(result.success) {
+                status.innerText = result.message;
+                status.className = "mt-4 text-sm text-center text-green-500";
+            } else {
+                status.innerText = "Error: " + result.error;
+                status.className = "mt-4 text-sm text-center text-red-500";
+            }
+        }
+    </script>
+</body>
+</html>
