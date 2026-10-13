@@ -6,44 +6,92 @@
     <title>KKBOX Downloader Web</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-md w-96">
-        <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">KKBOX Downloader</h1>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-2 text-center text-indigo-600">KKBOX Downloader</h1>
+        <p class="text-xs text-center text-gray-500 mb-6">Basado en la herramienta de <a href="https://github.com/adrianmejiam/KKBOX-DL" target="_blank" class="text-indigo-500 hover:underline font-semibold">adrianmejiam</a></p>
+
         <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2">URL de la canción/playlist:</label>
-            <input type="text" id="url" placeholder="https://www.kkbox.com/..." class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            <label class="block text-gray-700 text-sm font-bold mb-2">URL de la canción o playlist:</label>
+            <input type="text" id="url" placeholder="https://www.kkbox.com/..." class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
-        <button onclick="sendDownload()" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded w-full focus:outline-none focus:shadow-outline">
+
+        <button id="downloadBtn" onclick="startDownload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg w-full transition duration-200 focus:outline-none">
             Procesar / Descargar
         </button>
-        <p id="status" class="mt-4 text-sm text-center text-gray-600"></p>
+
+        <!-- Contenedor de la Barra de Progreso -->
+        <div id="progressContainer" class="mt-6 hidden">
+            <div class="flex justify-between mb-1">
+                <span id="statusText" class="text-xs font-semibold text-gray-700">Iniciando...</span>
+                <span id="percentText" class="text-xs font-semibold text-indigo-600">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+                <div id="progressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
     </div>
 
+    <!-- Créditos al Desarrollador -->
+    <footer class="mt-8 text-center text-gray-500 text-xs">
+        Desarrollado por <a href="https://github.com/adrianmejiam" target="_blank" class="font-bold text-gray-700 hover:underline">adrianmejiam</a> | Desplegado en Render
+    </footer>
+
     <script>
-        async function sendDownload() {
-            const url = document.getElementById('url').value;
-            const status = document.getElementById('status');
-            if(!url) {
-                status.innerText = "Por favor ingresa una URL válida.";
-                status.className = "mt-4 text-sm text-center text-red-500";
+        function startDownload() {
+            const urlInput = document.getElementById('url').value;
+            const btn = document.getElementById('downloadBtn');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const statusText = document.getElementById('statusText');
+            const percentText = document.getElementById('percentText');
+
+            if (!urlInput) {
+                alert("Por favor ingresa una URL válida de KKBOX.");
                 return;
             }
-            status.innerText = "Enviando solicitud...";
-            status.className = "mt-4 text-sm text-center text-blue-500";
-            
-            const response = await fetch('/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url })
-            });
-            const result = await response.json();
-            if(result.success) {
-                status.innerText = result.message;
-                status.className = "mt-4 text-sm text-center text-green-500";
-            } else {
-                status.innerText = "Error: " + result.error;
-                status.className = "mt-4 text-sm text-center text-red-500";
-            }
+
+            // Resetear interfaz
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            percentText.innerText = '0%';
+            statusText.innerText = 'Conectando...';
+
+            // Escuchar eventos en tiempo real desde el backend
+            const eventSource = new EventSource(`/stream-download?url=${encodeURIComponent(urlInput)}`);
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                progressBar.style.width = `${data.progress}%`;
+                percentText.innerText = `${data.progress}%`;
+                statusText.innerText = data.status;
+
+                // Cuando la descarga finaliza
+                if (data.download_url) {
+                    eventSource.close();
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50');
+
+                    // Descarga directa en el navegador
+                    const link = document.createElement('a');
+                    link.href = data.download_url;
+                    link.setAttribute('download', '');
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                }
+            };
+
+            eventSource.onerror = function(err) {
+                console.error("Error SSE:", err);
+                eventSource.close();
+                statusText.innerText = "Error en el procesamiento.";
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            };
         }
     </script>
 </body>
