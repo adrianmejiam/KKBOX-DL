@@ -3,27 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KKBOX Downloader FLAC</title>
+    <title>KKBOX OrpheusDL FLAC Downloader</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
     <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <div class="flex items-center justify-between mb-2">
-            <h1 class="text-2xl font-bold text-indigo-600">KKBOX Downloader</h1>
+            <h1 class="text-xl font-bold text-indigo-600">KKBOX OrpheusDL</h1>
             <span class="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-0.5 rounded border border-green-400">FLAC Lossless</span>
         </div>
-        <p class="text-xs text-gray-500 mb-6">Desarrollado por <a href="https://github.com/adrianmejiam/KKBOX-DL" target="_blank" class="text-indigo-500 hover:underline font-semibold">adrianmejiam</a></p>
+        <p class="text-xs text-gray-500 mb-6">Desarrollado por <a href="https://github.com/adrianmejiam" target="_blank" class="text-indigo-500 hover:underline font-semibold">adrianmejiam</a></p>
 
         <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2">URL de la canción o playlist:</label>
+            <label class="block text-gray-700 text-sm font-bold mb-2">URL de KKBOX (Canción / Playlist / Álbum):</label>
             <input type="text" id="url" placeholder="https://www.kkbox.com/..." class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
 
         <button id="downloadBtn" onclick="startDownload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg w-full transition duration-200 focus:outline-none">
-            Descargar FLAC (Máxima Calidad)
+            Descargar FLAC en Máxima Calidad
         </button>
 
-        <!-- Barra de progreso -->
         <div id="progressContainer" class="mt-6 hidden">
             <div class="flex justify-between mb-1">
                 <span id="statusText" class="text-xs font-semibold text-gray-700">Iniciando...</span>
@@ -36,11 +35,11 @@
     </div>
 
     <footer class="mt-8 text-center text-gray-500 text-xs">
-        Desarrollado por <a href="https://github.com/adrianmejiam" target="_blank" class="font-bold text-gray-700 hover:underline">adrianmejiam</a> | Desplegado en Render
+        Basado en <a href="https://github.com/OrfiTeam/OrpheusDL" target="_blank" class="underline">OrpheusDL</a> &amp; <a href="https://github.com/uhwot/orpheusdl-kkbox" target="_blank" class="underline">orpheusdl-kkbox</a> | Creado por <span class="font-bold text-gray-700">adrianmejiam</span>
     </footer>
 
     <script>
-        function startDownload() {
+        async function startDownload() {
             const urlInput = document.getElementById('url').value;
             const btn = document.getElementById('downloadBtn');
             const progressContainer = document.getElementById('progressContainer');
@@ -58,39 +57,50 @@
             progressContainer.classList.remove('hidden');
             progressBar.style.width = '0%';
             percentText.innerText = '0%';
-            statusText.innerText = 'Conectando con KKBOX...';
+            statusText.innerText = 'Conectando con OrpheusDL...';
 
-            const eventSource = new EventSource(`/stream-download?url=${encodeURIComponent(urlInput)}`);
-
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
+            try {
+                const response = await fetch('/start-download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput })
+                });
+                const result = await response.json();
                 
-                progressBar.style.width = `${data.progress}%`;
-                percentText.innerText = `${data.progress}%`;
-                statusText.innerText = data.status;
+                if (result.task_id) {
+                    const eventSource = new EventSource(`/check-progress/${result.task_id}`);
 
-                if (data.download_url) {
-                    eventSource.close();
-                    btn.disabled = false;
-                    btn.classList.remove('opacity-50');
+                    eventSource.onmessage = function(event) {
+                        const data = JSON.parse(event.data);
+                        
+                        progressBar.style.width = `${data.progress}%`;
+                        percentText.innerText = `${data.progress}%`;
+                        statusText.innerText = data.status;
 
-                    // Descarga del archivo .flac directo al navegador
-                    const link = document.createElement('a');
-                    link.href = data.download_url;
-                    link.setAttribute('download', '');
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
+                        if (data.download_url) {
+                            eventSource.close();
+                            btn.disabled = false;
+                            btn.classList.remove('opacity-50');
+
+                            const link = document.createElement('a');
+                            link.href = data.download_url;
+                            link.setAttribute('download', '');
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                        } else if (data.error) {
+                            eventSource.close();
+                            btn.disabled = false;
+                            btn.classList.remove('opacity-50');
+                        }
+                    };
                 }
-            };
-
-            eventSource.onerror = function(err) {
-                console.error("Error SSE:", err);
-                eventSource.close();
-                statusText.innerText = "Error al procesar la descarga en FLAC.";
+            } catch (err) {
+                console.error("Error:", err);
+                statusText.innerText = "Error de comunicación con el servidor.";
                 btn.disabled = false;
                 btn.classList.remove('opacity-50');
-            };
+            }
         }
     </script>
 </body>
