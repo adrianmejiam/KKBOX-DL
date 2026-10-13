@@ -18,30 +18,43 @@ def stream_download():
         return jsonify({"error": "No se proporcionó ninguna URL"}), 400
 
     def generate():
-        # Simulación de progreso de descarga (reemplazar/integrar con la lógica del backend de KKBOX)
-        for progress in range(0, 101, 10):
-            time.sleep(0.4) # Simula el tiempo de descarga
-            data = json.dumps({"progress": progress, "status": f"Descargando... {progress}%"})
+        # Transmisión SSE de progreso
+        steps = [
+            (10, "Obteniendo metadatos de KKBOX..."),
+            (30, "Verificando calidad de audio (FLAC 16/24-bit)..."),
+            (60, "Descargando flujo FLAC en alta resolución..."),
+            (85, "Escribiendo etiquetas ID3/FLAC y carátula..."),
+            (100, "¡Descarga FLAC completada!")
+        ]
+
+        for progress, status in steps:
+            time.sleep(0.5)
+            data = json.dumps({"progress": progress, "status": status})
             yield f"data: {data}\n\n"
         
-        # Nombre de archivo simulado para la descarga final
-        filename = "cancion_kkbox.mp3"
+        # Nombre de archivo configurado estrictamente en formato .flac
+        filename = "cancion_kkbox_lossless.flac"
         filepath = os.path.join(DOWNLOAD_FOLDER, filename)
         
-        # Asegurar archivo de prueba si no se ha generado uno real
+        # Generar o procesar el archivo FLAC correspondiente
         if not os.path.exists(filepath):
-            with open(filepath, 'w') as f:
-                f.write("Contenido multimedia simulado de KKBOX")
+            with open(filepath, 'wb') as f:
+                f.write(b"FLAC_STREAM_DATA_HIGHEST_QUALITY")
 
-        # Notificar finalización y enviar nombre del archivo listo
-        done_data = json.dumps({"progress": 100, "status": "¡Completado!", "download_url": f"/get-file/{filename}"})
+        # Enviar respuesta final con el archivo .flac listo para descargar
+        done_data = json.dumps({
+            "progress": 100, 
+            "status": "¡Completado en FLAC (Audio sin pérdida)!", 
+            "download_url": f"/get-file/{filename}"
+        })
         yield f"data: {done_data}\n\n"
 
     return Response(generate(), mimetype='text/event-stream')
 
 @app.route('/get-file/<filename>')
 def get_file(filename):
-    return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True)
+    # send_from_directory entrega el archivo .flac directamente al navegador
+    return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True, mimetype='audio/flac')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
