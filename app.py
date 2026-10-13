@@ -6,17 +6,21 @@ import threading
 from flask import Flask, render_template, request, Response, send_from_directory, jsonify
 
 app = Flask(__name__)
-DOWNLOAD_FOLDER = os.path.join(app.root_path, 'downloads')
+BASE_DIR = app.root_path
+ORPHEUS_DIR = os.path.join(BASE_DIR, 'orpheus_base')
+DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
+
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# Configuración automática del archivo settings.json de OrpheusDL con tus credenciales integradas
+# Configuración de credenciales dentro del directorio de OrpheusDL
 def setup_orpheus_config():
-    config_dir = os.path.join(app.root_path, 'config')
+    config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
 
     settings = {
-        "download_quality": "lossless",
+        "download_quality": "hifi",
+        "download_path": DOWNLOAD_FOLDER,
         "modules": {
             "kkbox": {
                 "email": "15cb1b133c@emailnox.live",
@@ -30,16 +34,13 @@ def setup_orpheus_config():
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=4)
 
-# Inicializar configuración al arrancar
-setup_orpheus_config()
 download_status = {}
-
-@app.route('/')
-def index():
-    return render_template('index.html')
 
 def run_orpheus_download(task_id, url):
     try:
+        # Asegurar la configuración
+        setup_orpheus_config()
+
         download_status[task_id] = {"progress": 15, "status": "Iniciando sesión en KKBOX con OrpheusDL..."}
         
         output_dir = os.path.join(DOWNLOAD_FOLDER, task_id)
@@ -47,8 +48,11 @@ def run_orpheus_download(task_id, url):
 
         download_status[task_id] = {"progress": 40, "status": "Descargando flujo FLAC Lossless..."}
         
-        cmd = ["orpheusdl", "-d", output_dir, url]
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # Ejecutar orpheus.py mediante el intérprete de Python
+        script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
+        cmd = ["python3", script_path, url]
+        
+        process = subprocess.Popen(cmd, cwd=ORPHEUS_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
         for line in process.stdout:
             print(line.strip())
@@ -56,19 +60,19 @@ def run_orpheus_download(task_id, url):
         process.wait()
 
         if process.returncode != 0:
-            raise Exception("OrpheusDL finalizó con errores. Verifica las credenciales o la validez de la URL.")
+            raise Exception("OrpheusDL finalizó con errores. Revisa la consola de Render para detalles.")
 
         download_status[task_id] = {"progress": 85, "status": "Empaquetando archivo FLAC..."}
         
         flac_file = None
-        for root, dirs, files in os.walk(output_dir):
+        for root, dirs, files in os.walk(DOWNLOAD_FOLDER):
             for file in files:
-                if file.endswith('.flac'):
+                if file.endswith('.flac') and not file.startswith('kkbox_lossless_'):
                     flac_file = os.path.join(root, file)
                     break
 
         if not flac_file:
-            raise Exception("No se encontró ningún archivo FLAC generado en la salida.")
+            raise Exception("No se encontró ningún archivo FLAC descargado.")
 
         final_filename = f"kkbox_lossless_{task_id}.flac"
         final_filepath = os.path.join(DOWNLOAD_FOLDER, final_filename)
@@ -82,6 +86,10 @@ def run_orpheus_download(task_id, url):
 
     except Exception as e:
         download_status[task_id] = {"progress": 100, "status": f"Error: {str(e)}", "error": True}
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/start-download', methods=['POST'])
 def start_download():
