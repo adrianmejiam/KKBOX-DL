@@ -1,34 +1,35 @@
 #!/usr/bin/env bash
-# Salir si ocurre un error
+# Salir inmediatamente si un comando falla
 set -o errexit
 
-echo "=== Iniciando la preparación del entorno ==="
+echo "=== Preparando entorno para OrpheusDL + KKBOX ==="
 
-# 1. Clonar el repositorio base de OrpheusDL si no existe
+# 1. Clonar el repositorio base de OrpheusDL si no está presente
 if [ ! -d "orpheusdl" ]; then
-    echo "Clonando OrpheusDL..."
+    echo "Clonando framework base OrpheusDL..."
     git clone https://github.com orpheusdl
 fi
 
-# 2. Clonar el módulo de KKBOX dentro de la carpeta correspondiente
+# 2. Clonar el módulo de KKBOX dentro de la carpeta de módulos
 if [ ! -d "orpheusdl/modules/kkbox" ]; then
     echo "Instalando módulo KKBOX..."
     git clone https://github.com orpheusdl/modules/kkbox
 fi
 
-# 3. Instalar todas las dependencias de Python
+# 3. Instalar requerimientos
 echo "Instalando dependencias de Python..."
 pip install -r orpheusdl/requirements.txt
 pip install flask gunicorn
 
-# 4. Crear una configuración base por defecto de forma dinámica
-echo "Generando archivo de configuración inicial..."
+# 4. Inyectar de forma dinámica las credenciales y llaves de la API
+echo "Escribiendo archivo de configuración..."
 mkdir -p orpheusdl/config
 cat <<EOT > orpheusdl/config/settings.json
 {
     "global": {
         "download_quality": "high",
-        "main_resolution": 2048
+        "main_resolution": 2048,
+        "output_dir": "../downloads"
     },
     "kkbox": {
         "email": "${KKBOX_EMAIL}",
@@ -39,4 +40,7 @@ cat <<EOT > orpheusdl/config/settings.json
 }
 EOT
 
-echo "=== Entorno preparado con éxito ==="
+# Crear el directorio donde se almacenarán temporalmente las descargas
+mkdir -p downloads
+
+echo "=== Configuración de entorno finalizada ==="
