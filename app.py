@@ -6,7 +6,6 @@ import zipfile
 
 app = Flask(__name__)
 
-# Directorio absoluto donde se guardarán las canciones dentro del contenedor de Render
 DOWNLOAD_DIR = os.path.abspath("downloads")
 
 HTML_TEMPLATE = """
@@ -129,7 +128,6 @@ def download():
     try:
         archivos_antes = set(glob.glob(os.path.join(DOWNLOAD_DIR, '**/*', '*.*'), recursive=True))
         
-        # Moverse al directorio del framework base
         os.chdir('orpheusdl')
         result = subprocess.run(
             ['python', 'orpheus.py', url],
@@ -137,7 +135,7 @@ def download():
             stderr=subprocess.STDOUT,
             text=True
         )
-        os.chdir('..') # Regresar a la raíz
+        os.chdir('..')
         
         archivos_despues = set(glob.glob(os.path.join(DOWNLOAD_DIR, '**/*', '*.*'), recursive=True))
         nuevos_archivos = list(archivos_despues - archivos_antes)
