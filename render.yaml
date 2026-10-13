@@ -2,7 +2,7 @@ services:
   - type: web
     name: kkbox-cloud-downloader
     env: python
-    region: sgp  # Despliegue en Singapur para omitir restricciones geográficas sin usar VPN
+    region: sgp
     buildCommand: ./render_setup.sh
     startCommand: gunicorn app:app
     envVars:
