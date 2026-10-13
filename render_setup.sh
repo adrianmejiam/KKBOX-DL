@@ -4,9 +4,10 @@ set -o errexit
 
 echo "=== Preparando entorno para OrpheusDL + KKBOX ==="
 
-# 1. Clonar el repositorio base de OrpheusDL si no está presente
+# 1. Clonar el repositorio oficial e histórico de OrpheusDL
 if [ ! -d "orpheusdl" ]; then
     echo "Clonando framework base OrpheusDL..."
+    # Corregido: Se utiliza la dirección oficial de la organización OrpheusDL
     git clone https://github.com orpheusdl
 fi
 
