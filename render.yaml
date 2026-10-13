@@ -2,6 +2,7 @@ services:
   - type: web
     name: kkbox-cloud-downloader
     env: python
+    region: sgp  # <--- Esto fuerza a Render a desplegar en Singapur (Región soportada por KKBOX)
     buildCommand: ./render_setup.sh
     startCommand: gunicorn app:app
     envVars:
