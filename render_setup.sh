@@ -7,13 +7,13 @@ echo "=== Preparando entorno definitivo OrpheusDL + KKBOX ==="
 # 1. Clonar el repositorio base oficial desde OrfiTeam
 if [ ! -d "orpheusdl" ]; then
     echo "Clonando framework base OrpheusDL desde OrfiTeam..."
-    git clone https://github.com/OrfiTeam/OrpheusDL.git orpheusdl
+    git clone https://github.com orpheusdl
 fi
 
 # 2. Clonar el módulo de KKBOX desde el usuario uhwot
 if [ ! -d "orpheusdl/modules/kkbox" ]; then
     echo "Instalando módulo KKBOX desde uhwot..."
-    git clone https://github.com/uhwot/orpheusdl-kkbox.git orpheusdl/modules/kkbox
+    git clone https://github.com orpheusdl/modules/kkbox
 fi
 
 # 3. Instalar requerimientos base del sistema y Flask para el entorno web
@@ -21,15 +21,22 @@ echo "Instalando dependencias de Python..."
 pip install -r orpheusdl/requirements.txt
 pip install flask gunicorn
 
-# 4. Inyectar de forma dinámica las credenciales del usuario y llaves de la API
+# 4. Forzar la inicialización nativa de la base de datos de configuraciones de Orpheus
+echo "Inicializando configuración base de OrpheusDL..."
+cd orpheusdl
+python orpheus.py settings refresh
+cd ..
+
+# 5. Inyectar de forma dinámica las credenciales del usuario y llaves de la API
 echo "Escribiendo archivo de configuración config/settings.json..."
 mkdir -p orpheusdl/config
 cat <<EOT > orpheusdl/config/settings.json
 {
     "global": {
+        "download_path": "../downloads/",
         "download_quality": "high",
         "main_resolution": 2048,
-        "output_dir": "../downloads"
+        "search_limit": 10
     },
     "kkbox": {
         "email": "${KKBOX_EMAIL}",
