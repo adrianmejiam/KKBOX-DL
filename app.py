@@ -1,6 +1,6 @@
 import os
-import time
 import json
+import time
 import subprocess
 import threading
 from flask import Flask, render_template, request, Response, send_from_directory, jsonify
@@ -9,6 +9,29 @@ app = Flask(__name__)
 DOWNLOAD_FOLDER = os.path.join(app.root_path, 'downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+# Configuración automática del archivo settings.json de OrpheusDL con tus credenciales integradas
+def setup_orpheus_config():
+    config_dir = os.path.join(app.root_path, 'config')
+    os.makedirs(config_dir, exist_ok=True)
+    config_path = os.path.join(config_dir, 'settings.json')
+
+    settings = {
+        "download_quality": "lossless",
+        "modules": {
+            "kkbox": {
+                "email": "15cb1b133c@emailnox.live",
+                "password": "Mexico_2026",
+                "kc1_key": "7f1a68f00b747f4ac1469c72e7ef492c",
+                "secret_key": "0ff29b7c9bd8fb60a3abd6b3d402b02c"
+            }
+        }
+    }
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=4)
+
+# Inicializar configuración al arrancar
+setup_orpheus_config()
 download_status = {}
 
 @app.route('/')
@@ -17,32 +40,26 @@ def index():
 
 def run_orpheus_download(task_id, url):
     try:
-        download_status[task_id] = {"progress": 15, "status": "Inicializando OrpheusDL para KKBOX..."}
+        download_status[task_id] = {"progress": 15, "status": "Iniciando sesión en KKBOX con OrpheusDL..."}
         
-        # Directorio de salida temporal para la tarea
         output_dir = os.path.join(DOWNLOAD_FOLDER, task_id)
         os.makedirs(output_dir, exist_ok=True)
 
         download_status[task_id] = {"progress": 40, "status": "Descargando flujo FLAC Lossless..."}
         
-        # Comando para ejecutar orpheusdl apuntando a la URL
-        # OrpheusDL utiliza el módulo kkbox instalado previamente desde github
         cmd = ["orpheusdl", "-d", output_dir, url]
-        
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
         for line in process.stdout:
-            # Puedes depurar o interpretar la salida de orpheusdl si lo requieres
             print(line.strip())
             
         process.wait()
 
         if process.returncode != 0:
-            raise Exception("OrpheusDL finalizó con errores durante la extracción.")
+            raise Exception("OrpheusDL finalizó con errores. Verifica las credenciales o la validez de la URL.")
 
         download_status[task_id] = {"progress": 85, "status": "Empaquetando archivo FLAC..."}
         
-        # Buscar el archivo .flac generado dentro de la carpeta de salida
         flac_file = None
         for root, dirs, files in os.walk(output_dir):
             for file in files:
@@ -53,7 +70,6 @@ def run_orpheus_download(task_id, url):
         if not flac_file:
             raise Exception("No se encontró ningún archivo FLAC generado en la salida.")
 
-        # Mover el archivo a la carpeta principal de descargas con un nombre limpio
         final_filename = f"kkbox_lossless_{task_id}.flac"
         final_filepath = os.path.join(DOWNLOAD_FOLDER, final_filename)
         os.rename(flac_file, final_filepath)
