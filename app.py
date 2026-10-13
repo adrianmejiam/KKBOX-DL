@@ -12,8 +12,8 @@ DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
 
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# Configuración de credenciales dentro del directorio de OrpheusDL
 def setup_orpheus_config():
+    """Genera la configuración con credenciales de KKBOX dentro de orpheus_base/config/settings.json"""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
@@ -38,18 +38,20 @@ download_status = {}
 
 def run_orpheus_download(task_id, url):
     try:
-        # Asegurar la configuración
+        # Asegurar archivo de configuración antes de ejecutar
         setup_orpheus_config()
 
-        download_status[task_id] = {"progress": 15, "status": "Iniciando sesión en KKBOX con OrpheusDL..."}
+        download_status[task_id] = {"progress": 15, "status": "Iniciando sesión en KKBOX..."}
         
-        output_dir = os.path.join(DOWNLOAD_FOLDER, task_id)
-        os.makedirs(output_dir, exist_ok=True)
+        script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
+        
+        # Verificar que la carpeta del repositorio exista
+        if not os.path.exists(script_path):
+            raise Exception("No se encontró el archivo orpheus.py. Verifica el Build Command de Render.")
 
         download_status[task_id] = {"progress": 40, "status": "Descargando flujo FLAC Lossless..."}
         
-        # Ejecutar orpheus.py mediante el intérprete de Python
-        script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
+        # Ejecución usando python3 llamando al archivo script
         cmd = ["python3", script_path, url]
         
         process = subprocess.Popen(cmd, cwd=ORPHEUS_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -60,7 +62,7 @@ def run_orpheus_download(task_id, url):
         process.wait()
 
         if process.returncode != 0:
-            raise Exception("OrpheusDL finalizó con errores. Revisa la consola de Render para detalles.")
+            raise Exception("OrpheusDL finalizó con errores. Revisa los logs de Render para más información.")
 
         download_status[task_id] = {"progress": 85, "status": "Empaquetando archivo FLAC..."}
         
@@ -72,7 +74,7 @@ def run_orpheus_download(task_id, url):
                     break
 
         if not flac_file:
-            raise Exception("No se encontró ningún archivo FLAC descargado.")
+            raise Exception("No se encontró ningún archivo FLAC descargado en la carpeta de salida.")
 
         final_filename = f"kkbox_lossless_{task_id}.flac"
         final_filepath = os.path.join(DOWNLOAD_FOLDER, final_filename)
