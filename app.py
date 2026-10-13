@@ -13,10 +13,9 @@ DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 def ensure_orpheus_installed():
-    """Clona y configura OrpheusDL automáticamente si no se encuentra."""
+    """Clona y configura las herramientas base automáticamente si no están en el entorno."""
     script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
     if not os.path.exists(script_path):
-        print("Clonando OrpheusDL y módulo KKBOX...")
         try:
             subprocess.run(["git", "clone", "https://github.com/OrfiTeam/OrpheusDL.git", ORPHEUS_DIR], check=True)
             kkbox_modules_dir = os.path.join(ORPHEUS_DIR, 'modules', 'kkbox')
@@ -27,10 +26,10 @@ def ensure_orpheus_installed():
             if os.path.exists(requirements_path):
                 subprocess.run(["pip", "install", "-r", requirements_path], check=True)
         except Exception as e:
-            print(f"Error al instalar OrpheusDL: {e}")
+            print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera la configuración apuntando al directorio de la tarea específica."""
+    """Genera la configuración interna con tus credenciales de KKBOX."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
@@ -53,38 +52,46 @@ def setup_orpheus_config(task_download_dir):
 
 download_status = {}
 
-def run_orpheus_download(task_id, url):
+def run_download_task(task_id, url):
     try:
+        logs = []
+        def add_log(msg):
+            logs.append(msg)
+            download_status[task_id]["logs"] = list(logs)
+
         ensure_orpheus_installed()
         
-        # Crear subdirectorio específico para la tarea
         task_download_dir = os.path.join(DOWNLOAD_FOLDER, task_id)
         os.makedirs(task_download_dir, exist_ok=True)
 
         setup_orpheus_config(task_download_dir)
 
-        download_status[task_id] = {"progress": 15, "status": "Iniciando sesión en KKBOX..."}
-        
+        download_status[task_id] = {"progress": 15, "status": "Iniciando sesión en KKBOX...", "logs": logs}
+        add_log("[+] Autenticando cuenta de KKBOX...")
+
         script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
         if not os.path.exists(script_path):
-            raise Exception("No se encontró orpheus.py.")
+            raise Exception("No se pudo cargar el script de descarga.")
 
-        download_status[task_id] = {"progress": 40, "status": "Descargando flujo FLAC Lossless..."}
+        download_status[task_id]["progress"] = 35
+        download_status[task_id]["status"] = "Descargando flujo FLAC Lossless..."
+        add_log(f"[+] Procesando URL: {url}")
         
         cmd = ["python3", script_path, url]
         process = subprocess.Popen(cmd, cwd=ORPHEUS_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
-        output_logs = []
         for line in process.stdout:
             cleaned_line = line.strip()
             if cleaned_line:
-                output_logs.append(cleaned_line)
-                print(cleaned_line)
+                add_log(f"[MOTOR] {cleaned_line}")
+                if "100%" in cleaned_line or "Downloading" in cleaned_line:
+                    download_status[task_id]["progress"] = 65
             
         process.wait()
 
-        # Búsqueda recursiva de archivos .flac en la carpeta de la tarea y en la base de Orpheus
-        download_status[task_id] = {"progress": 80, "status": "Localizando archivo FLAC..."}
+        download_status[task_id]["progress"] = 85
+        download_status[task_id]["status"] = "Empaquetando archivo de audio..."
+        add_log("[+] Buscando archivo .flac generado...")
         
         flac_file = None
         search_dirs = [task_download_dir, DOWNLOAD_FOLDER, ORPHEUS_DIR]
@@ -102,23 +109,29 @@ def run_orpheus_download(task_id, url):
                 break
 
         if not flac_file:
-            last_log = output_logs[-1] if output_logs else "Sin detalles de salida"
-            raise Exception(f"OrpheusDL no generó el archivo FLAC. Último mensaje: {last_log}")
+            last_log = logs[-1] if logs else "Sin salida"
+            raise Exception(f"No se generó el archivo FLAC. Último log: {last_log}")
 
         final_filename = f"kkbox_lossless_{task_id}.flac"
         final_filepath = os.path.join(DOWNLOAD_FOLDER, final_filename)
-        
-        # Mover/Renombrar archivo encontrado a la raíz de descargas
         os.rename(flac_file, final_filepath)
+
+        add_log(f"[+] Archivo listado correctamente: {final_filename}")
 
         download_status[task_id] = {
             "progress": 100,
             "status": "¡Descarga FLAC completada con éxito!",
-            "download_url": f"/get-file/{final_filename}"
+            "download_url": f"/get-file/{final_filename}",
+            "logs": logs
         }
 
     except Exception as e:
-        download_status[task_id] = {"progress": 100, "status": f"Error: {str(e)}", "error": True}
+        download_status[task_id] = {
+            "progress": 100, 
+            "status": f"Error: {str(e)}", 
+            "error": True,
+            "logs": download_status.get(task_id, {}).get("logs", []) + [f"[ERROR] {str(e)}"]
+        }
 
 @app.route('/')
 def index():
@@ -132,9 +145,9 @@ def start_download():
         return jsonify({"error": "No se proporcionó ninguna URL"}), 400
 
     task_id = str(int(time.time()))
-    download_status[task_id] = {"progress": 5, "status": "Preparando tarea..."}
+    download_status[task_id] = {"progress": 5, "status": "Preparando tarea...", "logs": ["[+] Tarea registrada."]}
     
-    thread = threading.Thread(target=run_orpheus_download, args=(task_id, url))
+    thread = threading.Thread(target=run_download_task, args=(task_id, url))
     thread.daemon = True
     thread.start()
 
@@ -148,7 +161,7 @@ def check_progress(task_id):
             yield f"data: {json.dumps(status_data)}\n\n"
             if status_data.get("progress") >= 100 or status_data.get("error"):
                 break
-            time.sleep(1)
+            time.sleep(0.5)
 
     return Response(generate(), mimetype='text/event-stream')
 
