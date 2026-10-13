@@ -12,6 +12,29 @@ DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
 
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+def ensure_orpheus_installed():
+    """Clona y configura OrpheusDL automáticamente si no se encuentra en el entorno."""
+    script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
+    if not os.path.exists(script_path):
+        print("Clonando OrpheusDL y módulo KKBOX automáticamente...")
+        try:
+            # Clonar repositorio base de OrpheusDL
+            subprocess.run(["git", "clone", "https://github.com/OrfiTeam/OrpheusDL.git", ORPHEUS_DIR], check=True)
+            
+            # Clonar módulo de KKBOX en la carpeta correspondiente
+            kkbox_modules_dir = os.path.join(ORPHEUS_DIR, 'modules', 'kkbox')
+            os.makedirs(os.path.dirname(kkbox_modules_dir), exist_ok=True)
+            subprocess.run(["git", "clone", "https://github.com/uhwot/orpheusdl-kkbox.git", kkbox_modules_dir], check=True)
+            
+            # Instalar dependencias internas de OrpheusDL
+            requirements_path = os.path.join(ORPHEUS_DIR, 'requirements.txt')
+            if os.path.exists(requirements_path):
+                subprocess.run(["pip", "install", "-r", requirements_path], check=True)
+                
+            print("OrpheusDL instalado y configurado con éxito en el arranque.")
+        except Exception as e:
+            print(f"Error al clonar/configurar OrpheusDL automáticamente: {e}")
+
 def setup_orpheus_config():
     """Genera la configuración con credenciales de KKBOX dentro de orpheus_base/config/settings.json"""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
@@ -34,26 +57,26 @@ def setup_orpheus_config():
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=4)
 
+# Asegurar instalación y configuración al arrancar la app en Render
+ensure_orpheus_installed()
+setup_orpheus_config()
+
 download_status = {}
 
 def run_orpheus_download(task_id, url):
     try:
-        # Asegurar archivo de configuración antes de ejecutar
+        ensure_orpheus_installed()
         setup_orpheus_config()
 
         download_status[task_id] = {"progress": 15, "status": "Iniciando sesión en KKBOX..."}
         
         script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
-        
-        # Verificar que la carpeta del repositorio exista
         if not os.path.exists(script_path):
-            raise Exception("No se encontró el archivo orpheus.py. Verifica el Build Command de Render.")
+            raise Exception("No se pudo inicializar orpheus.py de forma automática.")
 
         download_status[task_id] = {"progress": 40, "status": "Descargando flujo FLAC Lossless..."}
         
-        # Ejecución usando python3 llamando al archivo script
         cmd = ["python3", script_path, url]
-        
         process = subprocess.Popen(cmd, cwd=ORPHEUS_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
         for line in process.stdout:
