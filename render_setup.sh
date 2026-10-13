@@ -4,24 +4,24 @@ set -o errexit
 
 echo "=== Preparando entorno definitivo OrpheusDL + KKBOX ==="
 
-# 1. Clonar el repositorio base usando la URL absoluta completa de OrfiTeam
+# 1. Clonar el repositorio base oficial desde OrfiTeam
 if [ ! -d "orpheusdl" ]; then
     echo "Clonando framework base OrpheusDL desde OrfiTeam..."
-    git clone https://github.com orpheusdl
+    git clone https://github.com/OrfiTeam/OrpheusDL.git orpheusdl
 fi
 
-# 2. Clonar el módulo específico usando la URL absoluta completa de chuchungman
+# 2. Clonar el módulo de KKBOX desde el usuario uhwot
 if [ ! -d "orpheusdl/modules/kkbox" ]; then
-    echo "Instalando módulo KKBOX desde chuchungman..."
-    git clone https://github.com orpheusdl/modules/kkbox
+    echo "Instalando módulo KKBOX desde uhwot..."
+    git clone https://github.com/uhwot/orpheusdl-kkbox.git orpheusdl/modules/kkbox
 fi
 
-# 3. Instalar requerimientos base del sistema y Flask para la interfaz web
+# 3. Instalar requerimientos base del sistema y Flask para el entorno web
 echo "Instalando dependencias de Python..."
 pip install -r orpheusdl/requirements.txt
 pip install flask gunicorn
 
-# 4. Inyectar de forma dinámica las credenciales y llaves fijas de la API
+# 4. Inyectar de forma dinámica las credenciales del usuario y llaves de la API
 echo "Escribiendo archivo de configuración config/settings.json..."
 mkdir -p orpheusdl/config
 cat <<EOT > orpheusdl/config/settings.json
