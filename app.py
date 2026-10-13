@@ -2,10 +2,11 @@ from flask import Flask, request, jsonify, render_template_string, send_from_dir
 import subprocess
 import os
 import glob
+import zipfile
 
 app = Flask(__name__)
 
-# Directorio donde se guardarán las canciones dentro del contenedor de Render
+# Directorio absoluto donde se guardarán las canciones dentro del contenedor de Render
 DOWNLOAD_DIR = os.path.abspath("downloads")
 
 HTML_TEMPLATE = """
@@ -13,78 +14,110 @@ HTML_TEMPLATE = """
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>KKBOX Downloader - Cloud</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KKBOX Cloud Downloader</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 650px; margin: 40px auto; padding: 20px; background: #0f172a; color: #cbd5e1; }
-        .card { background: #1e293b; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
-        h2 { margin-top: 0; color: #38bdf8; }
-        input[type="text"] { width: 100%; padding: 12px; margin: 15px 0; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; }
-        button { background: #0284c7; color: white; padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; font-size: 15px; }
+        .card { background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); position: relative; padding-bottom: 60px; }
+        h2 { margin-top: 0; color: #38bdf8; text-align: center; }
+        
+        /* Opciones de tipo de descarga */
+        .options-container { display: flex; justify-content: space-between; margin: 20px 0 10px 0; gap: 10px; }
+        .option-box { flex: 1; text-align: center; padding: 12px; background: #1e293b; border: 2px solid #475569; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+        .option-box:hover { border-color: #38bdf8; background: #1e293b; }
+        .option-box.active { border-color: #38bdf8; background: #0369a1; color: white; font-weight: bold; }
+        
+        input[type="text"] { width: 100%; padding: 12px; margin: 15px 0; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; font-size: 14px; }
+        button { background: #0284c7; color: white; padding: 14px 20px; border: none; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; font-size: 16px; transition: background 0.2s; }
         button:hover { background: #0369a1; }
         button:disabled { background: #475569; cursor: not-allowed; }
-        pre { background: #090d16; color: #34d399; padding: 15px; overflow-x: auto; border-radius: 6px; min-height: 120px; font-family: 'Courier New', Courier, monospace; font-size: 13px; }
-        .download-zone { margin-top: 20px; padding: 15px; background: #0284c7; border-radius: 6px; text-align: center; display: none; }
-        .download-zone a { color: white; text-decoration: none; font-weight: bold; display: block; width: 100%; }
+        
+        pre { background: #090d16; color: #34d399; padding: 15px; overflow-x: auto; border-radius: 6px; min-height: 120px; font-family: 'Courier New', Courier, monospace; font-size: 13px; margin-top: 20px; }
+        .download-zone { margin-top: 20px; padding: 15px; background: #10b981; border-radius: 6px; text-align: center; display: none; animation: fadeIn 0.5s ease; }
+        .download-zone a { color: white; text-decoration: none; font-weight: bold; display: block; width: 100%; font-size: 15px; }
+        
+        /* Crédito del desarrollador */
+        .footer { position: absolute; bottom: 15px; right: 30px; font-size: 12px; color: #64748b; font-style: italic; }
+        .footer span { color: #38bdf8; font-weight: bold; font-style: normal; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>KKBOX Cloud Downloader</h2>
-        <p>Inserta un enlace válido de KKBOX (canción, álbum o lista de reproducción):</p>
-        <input type="text" id="url" placeholder="https://kkbox.fm...">
+        <p style="text-align: center; margin-bottom: 5px;">Selecciona el tipo de contenido que deseas procesar:</p>
+        
+        <div class="options-container">
+            <div id="opt-track" class="option-box active" onclick="selectOption('track')">🎵 Canción Individual</div>
+            <div id="opt-album" class="option-box" onclick="selectOption('album')">💿 Álbum Completo</div>
+            <div id="opt-playlist" class="option-box" onclick="selectOption('playlist')">📝 Playlist</div>
+        </div>
+
+        <input type="text" id="url" placeholder="Pega el enlace de KKBOX aquí...">
         <button id="btn-procesar" onclick="iniciarDescarga()">Procesar en Servidor</button>
         
         <h3>Registro del Servidor:</h3>
-        <pre id="output">Consola lista. Esperando instrucciones...</pre>
+        <pre id="output">Consola lista. Selecciona una opción, introduce la URL y presiona Procesar...</pre>
         
         <div id="download-container" class="download-zone">
-            <a id="download-link" href="#" target="_blank">📥 DESCARGAR ARCHIVO PROCESADO</a>
+            <a id="download-link" href="#" target="_blank">📥 DESCARGAR ARCHIVO PROCESADO (.ZIP / MP3 / FLAC)</a>
         </div>
+
+        <div class="footer">Desarrollado por: <span>adrianmejiam</span></div>
     </div>
 
     <script>
+        let tipoSeleccionado = 'track';
+
+        function selectOption(tipo) {
+            tipoSeleccionado = tipo;
+            document.querySelectorAll('.option-box').forEach(el => el.classList.remove('active'));
+            if(tipo === 'track') document.getElementById('opt-track').classList.add('active');
+            if(tipo === 'album') document.getElementById('opt-album').classList.add('active');
+            if(tipo === 'playlist') document.getElementById('opt-playlist').classList.add('active');
+        }
+
         async function iniciarDescarga() {
-            const urlInput = document.getElementById('url').value.strip();
+            const urlInput = document.getElementById('url').value.trim();
             const outputBox = document.getElementById('output');
             const btn = document.getElementById('btn-procesar');
             const dlContainer = document.getElementById('download-container');
             
             if(!urlInput) {
-                alert('Por favor, ingresa una URL válida.');
+                alert('Por favor, ingresa una URL válida de KKBOX.');
                 return;
             }
             
-            // Bloquear controles e inicializar estados
             btn.disabled = true;
             btn.innerText = "Procesando...";
             dlContainer.style.display = "none";
-            outputBox.innerText = "[INFO] Conectando con OrpheusDL backend...\\n[INFO] Ejecutando decodificación de flujo de audio...\\n";
+            outputBox.innerText = `[INFO] Modo de descarga: \${tipoSeleccionado.toUpperCase()}\\n[INFO] Conectando con OrpheusDL backend...\\n[INFO] Descargando flujos multimedia directamente de KKBOX...\\n`;
             
             try {
                 const response = await fetch('/download', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url: urlInput })
+                    body: JSON.stringify({ url: urlInput, mode: tipoSeleccionado })
                 });
                 const data = await response.json();
                 
-                outputBox.innerText += `\\n[LOGS FINALES]:\\n${data.output}`;
+                outputBox.innerText += `\\n[LOGS FINALES]:\\n\${data.output}`;
                 
                 if (data.status === "success" && data.file_url) {
                     document.getElementById('download-link').href = data.file_url;
                     dlContainer.style.display = "block";
-                    outputBox.innerText += "\\n\\n[ÉXITO] El archivo está listo para descargarse a tu dispositivo.";
+                    outputBox.innerText += "\\n\\n[ÉXITO] Tu descarga está empaquetada y lista para guardarse en tu dispositivo.";
                 } else {
-                    outputBox.innerText += "\\n\\n[ERROR] No se pudo recuperar ningún archivo final. Revisa los logs.";
+                    outputBox.innerText += "\\n\\n[ERROR] No se pudo recuperar ningún archivo multimedia final.";
                 }
             } catch (err) {
-                outputBox.innerText += `\\n\\n[ERROR CRÍTICO]: No se obtuvo respuesta del servidor backend.`;
+                outputBox.innerText += `\\n\\n[ERROR CRÍTICO]: Pérdida de comunicación con el backend de Render.`;
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Procesar en Servidor";
             }
         }
-        String.prototype.strip = function() { return this.replace(/^\\s+|\\s+\$/g, ''); };
     </script>
 </body>
 </html>
@@ -98,15 +131,16 @@ def home():
 def download():
     data = request.json
     url = data.get('url', '').strip()
+    mode = data.get('mode', 'track')
     
     if not url:
-        return jsonify({"status": "error", "output": "URL vacía o inválida."}), 400
+        return jsonify({"status": "error", "output": "URL no válida."}), 400
         
     try:
-        # Registrar los archivos actuales antes de ejecutar la descarga
+        # 1. Registrar el estado del directorio antes de la descarga
         archivos_antes = set(glob.glob(os.path.join(DOWNLOAD_DIR, '**/*', '*.*'), recursive=True))
         
-        # Moverse al directorio del módulo para ejecutarlo adecuadamente
+        # 2. Entrar a la raíz de orpheusdl y ejecutar el binario CLI
         os.chdir('orpheusdl')
         result = subprocess.run(
             ['python', 'orpheus.py', url],
@@ -114,27 +148,45 @@ def download():
             stderr=subprocess.STDOUT,
             text=True
         )
-        os.chdir('..') # Volver al directorio raíz de la app
+        os.chdir('..') # Volver a la raíz principal
         
-        # Escanear los archivos después de la ejecución para detectar el nuevo contenido
+        # 3. Detectar qué archivos nuevos se generaron
         archivos_despues = set(glob.glob(os.path.join(DOWNLOAD_DIR, '**/*', '*.*'), recursive=True))
-        nuevos_archivos = archivos_despues - archivos_antes
+        nuevos_archivos = list(archivos_despues - archivos_antes)
         
         if nuevos_archivos and result.returncode == 0:
-            # Obtener el archivo más reciente generado
-            ruta_absoluta_archivo = max(nuevos_archivos, key=os.path.getmtime)
-            # Calcular la ruta relativa con respecto a la carpeta "downloads"
-            ruta_relativa = os.path.relpath(ruta_absoluta_archivo, DOWNLOAD_DIR)
-            
-            return jsonify({
-                "status": "success",
-                "output": result.stdout,
-                "file_url": f"/fetch-file/{ruta_relativa}"
-            })
+            # Si el usuario bajó un álbum o playlist y hay múltiples archivos, creamos un archivo comprimido .ZIP
+            if len(nuevos_archivos) > 1 or mode in ['album', 'playlist']:
+                ruta_zip = os.path.join(DOWNLOAD_DIR, "pack_descarga_kkbox.zip")
+                
+                # Eliminar ZIP viejo si existe
+                if os.path.exists(ruta_zip):
+                    os.remove(ruta_zip)
+                    
+                with zipfile.ZipFile(ruta_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for archivo in nuevos_archivos:
+                        # Evitar meter el propio archivo ZIP dentro del ZIP
+                        if archivo != ruta_zip:
+                            zipf.write(archivo, os.path.basename(archivo))
+                            
+                return jsonify({
+                    "status": "success",
+                    "output": result.stdout + f"\n\n[PROCESO] Se empaquetaron {len(nuevos_archivos)} pistas en un archivo único .ZIP",
+                    "file_url": "/fetch-file/pack_descarga_kkbox.zip"
+                })
+            else:
+                # Si es una sola pista, se entrega el archivo multimedia directamente
+                ruta_absoluta = max(nuevos_archivos, key=os.path.getmtime)
+                ruta_relativa = os.path.relpath(ruta_absoluta, DOWNLOAD_DIR)
+                return jsonify({
+                    "status": "success",
+                    "output": result.stdout,
+                    "file_url": f"/fetch-file/{ruta_relativa}"
+                })
         else:
             return jsonify({
                 "status": "failed",
-                "output": result.stdout + "\n[ALERTA] No se detectaron nuevos archivos guardados en el directorio de salida."
+                "output": result.stdout + "\n[ALERTA] El proceso terminó pero no se guardó ningún archivo nuevo en el disco."
             })
             
     except Exception as e:
@@ -142,9 +194,6 @@ def download():
 
 @app.route('/fetch-file/<path:filename>', methods=['GET'])
 def fetch_file(filename):
-    """Permite al navegador descargar los archivos del directorio interno del servidor"""
+    """Permite la descarga directa de archivos binarios al navegador"""
     return send_from_directory(DOWNLOAD_DIR, filename, as_attachment=True)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-    
