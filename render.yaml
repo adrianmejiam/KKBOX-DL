@@ -1,17 +1,9 @@
 services:
   - type: web
-    name: kkbox-cloud-downloader
+    name: kkbox-dl-app
     env: python
-    region: sgp
-    buildCommand: ./render_setup.sh
-    startCommand: gunicorn app:app
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
     envVars:
-      - key: KKBOX_EMAIL
-        value: "15cb1b133c@emailnox.live"
-      - key: KKBOX_PASSWORD
-        value: "Mexico_2026"
-      - key: KKBOX_KC1_KEY
-        value: "7f1a68f00b747f4ac1469c72e7ef492c"
-      - key: KKBOX_SECRET_KEY
-        value: "0ff29b7c9bd8fb60a3abd6b3d402b02c"
-        
+      - key: PYTHON_VERSION
+        value: 3.10.0
