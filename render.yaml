@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: kkbox-downloader-cloud
+    env: python
+    buildCommand: ./render_setup.sh
+    startCommand: gunicorn app:app
+    envVars:
+      - key: KKBOX_EMAIL
+        sync: false
+      - key: KKBOX_PASSWORD
+        sync: false
+      - key: KKBOX_KC1_KEY
+        sync: false
+      - key: KKBOX_SECRET_KEY
+        sync: false
+        
