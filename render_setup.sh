@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
-# Salir inmediatamente si un comando falla
+# Salir inmediatamente si algún comando en la secuencia falla
 set -o errexit
 
-echo "=== Preparando entorno definitivo OrpheusDL + KKBOX ==="
+echo "=== Iniciando la preparación del entorno OrpheusDL + KKBOX ==="
 
-# 1. Clonar el repositorio base oficial desde OrfiTeam
+# 1. Clonar el framework base oficial de OrfiTeam usando la ruta explícita final
 if [ ! -d "orpheusdl" ]; then
     echo "Clonando framework base OrpheusDL desde OrfiTeam..."
-    git clone https://github.com orpheusdl
+    git clone "https://github.com/OrfiTeam/OrpheusDL.git" orpheusdl
 fi
 
-# 2. Clonar el módulo de KKBOX desde el usuario uhwot
+# 2. Clonar el módulo de KKBOX de uhwot usando la ruta explícita final
 if [ ! -d "orpheusdl/modules/kkbox" ]; then
     echo "Instalando módulo KKBOX desde uhwot..."
-    git clone https://github.com orpheusdl/modules/kkbox
+    git clone "https://github.com" orpheusdl/modules/kkbox
 fi
 
-# 3. Instalar requerimientos base del sistema y Flask para el entorno web
+# 3. Instalar todos los requerimientos base del sistema y Flask
 echo "Instalando dependencias de Python..."
 pip install -r orpheusdl/requirements.txt
 pip install flask gunicorn
 
-# 4. Forzar la inicialización nativa de la base de datos de configuraciones de Orpheus
-echo "Inicializando configuración base de OrpheusDL..."
+# 4. Inicializar nativamente la base de configuración de OrpheusDL
+echo "Inicializando configuraciones base..."
 cd orpheusdl
 python orpheus.py settings refresh
 cd ..
 
-# 5. Inyectar de forma dinámica las credenciales del usuario y llaves de la API
+# 5. Inyectar los accesos y parámetros de desencripción en el settings.json
 echo "Escribiendo archivo de configuración config/settings.json..."
 mkdir -p orpheusdl/config
 cat <<EOT > orpheusdl/config/settings.json
@@ -47,7 +47,7 @@ cat <<EOT > orpheusdl/config/settings.json
 }
 EOT
 
-# Crear el directorio donde se almacenarán temporalmente las descargas
+# Crear el directorio físico donde se van a compilar las descargas en tránsito
 mkdir -p downloads
 
-echo "=== Configuración de entorno finalizada con éxito ==="
+echo "=== Entorno preparado exitosamente para adrianmejiam ==="
