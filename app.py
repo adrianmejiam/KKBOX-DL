@@ -36,7 +36,6 @@ def setup_orpheus_config(task_download_dir):
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
 
-    # Si no existe la configuración base, la generamos con el comando nativo una sola vez
     if not os.path.exists(config_path):
         try:
             subprocess.run(["python3", script_path, "settings", "refresh"], cwd=ORPHEUS_DIR, check=True)
@@ -79,7 +78,6 @@ def setup_orpheus_config(task_download_dir):
         "secret_key": secret_key
     }
 
-    # Escribimos de forma definitiva el archivo con toda la estructura requerida
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=4)
 
@@ -94,6 +92,7 @@ def run_download_task(task_id, url):
 
         ensure_orpheus_installed()
         
+        # Carpeta única y exclusiva para esta tarea específica
         task_download_dir = os.path.join(DOWNLOAD_FOLDER, task_id)
         os.makedirs(task_download_dir, exist_ok=True)
 
@@ -129,19 +128,31 @@ def run_download_task(task_id, url):
         add_log("[+] Localizando archivo de audio descargado...")
         
         audio_file = None
-        search_dirs = [task_download_dir, DOWNLOAD_FOLDER, ORPHEUS_DIR]
         
-        for s_dir in search_dirs:
-            if os.path.exists(s_dir):
-                for root, dirs, files in os.walk(s_dir):
-                    for file in files:
-                        if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
-                            audio_file = os.path.join(root, file)
-                            break
-                    if audio_file:
-                        break
-            if audio_file:
-                break
+        # Búsqueda estricta: Priorizamos el directorio exclusivo de esta tarea ordenado por fecha de modificación reciente
+        candidate_files = []
+        if os.path.exists(task_download_dir):
+            for root, dirs, files in os.walk(task_download_dir):
+                for file in files:
+                    if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
+                        full_path = os.path.join(root, file)
+                        candidate_files.append((full_path, os.path.getmtime(full_path)))
+
+        # Si no hay archivos en la carpeta de la tarea, buscamos de manera general pero tomando el más reciente de los últimos segundos
+        if not candidate_files and os.path.exists(DOWNLOAD_FOLDER):
+            for root, dirs, files in os.walk(DOWNLOAD_FOLDER):
+                # Evitamos buscar dentro de otras subcarpetas de task_id antiguas
+                if root != DOWNLOAD_FOLDER and os.path.basename(root) != task_id:
+                    continue
+                for file in files:
+                    if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
+                        full_path = os.path.join(root, file)
+                        candidate_files.append((full_path, os.path.getmtime(full_path)))
+
+        if candidate_files:
+            # Ordenar por fecha de modificación (el más reciente primero) para asegurar que obtenemos el de la petición actual
+            candidate_files.sort(key=lambda x: x[1], reverse=True)
+            audio_file = candidate_files[0][0]
 
         if not audio_file:
             last_log = logs[-1] if logs else "Sin salida"
@@ -149,15 +160,16 @@ def run_download_task(task_id, url):
 
         original_filename = os.path.basename(audio_file)
         
-        if os.path.dirname(audio_file) == DOWNLOAD_FOLDER:
-            safe_filename = original_filename
-        else:
-            safe_filename = f"{task_id}_{original_filename}"
-            final_filepath = os.path.join(DOWNLOAD_FOLDER, safe_filename)
-            if audio_file != final_filepath:
-                if os.path.exists(final_filepath):
-                    os.remove(final_filepath)
-                os.replace(audio_file, final_filepath)
+        # Asignamos un nombre único absoluto combinando el task_id con el nombre real de la pista
+        safe_filename = f"{task_id}_{original_filename}"
+        final_filepath = os.path.join(DOWNLOAD_FOLDER, safe_filename)
+        
+        if audio_file != final_filepath:
+            if os.path.exists(final_filepath):
+                os.remove(final_filepath)
+            # Copiamos o movemos el archivo al directorio principal con su nombre único de tarea
+            import shutil
+            shutil.copy(audio_file, final_filepath)
 
         add_log(f"[+] Archivo listo con carátula integrada: {safe_filename}")
 
