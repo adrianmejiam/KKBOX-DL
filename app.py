@@ -30,7 +30,7 @@ def ensure_orpheus_installed():
             print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera o actualiza settings.json preservando la estructura oficial y forzando carátulas."""
+    """Genera o actualiza settings.json forzando formatos únicos de pistas para evitar sobrescrituras."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
@@ -58,6 +58,11 @@ def setup_orpheus_config(task_download_dir):
     settings["global"]["download_quality"] = "hifi"
     settings["global"]["main_resolution"] = 2048
     settings["global"]["search_limit"] = 10
+    
+    # --- CORRECCIÓN: Nombres de archivo únicos basados en número y título para evitar sobrescritura ---
+    settings["global"]["track_format"] = "{track_number} - {artist} - {name}"
+    settings["global"]["album_format"] = "{album_artist}/{album}/{track_number} - {name}"
+    
     # Forzar la incrustación de carátula en alta calidad
     settings["global"]["embed_cover"] = True
     settings["global"]["save_cover"] = True
@@ -196,7 +201,7 @@ def start_download():
 def get_progress_json(task_id):
     if task_id in download_status:
         return jsonify(download_status[task_id])
-    return jsonify({"error": "Tarea no encontrada"}), 404
+    return jsonify({"error": "Tarea no encontrada"}}, 404
 
 @app.route('/get-file/<filename>')
 def get_file(filename):
