@@ -2,8 +2,16 @@ services:
   - type: web
     name: kkbox-orpheus-dl
     env: python
-    buildCommand: "pip install -r requirements.txt && git clone https://github.com/OrfiTeam/OrpheusDL.git orpheus_base && git clone https://github.com/uhwot/orpheusdl-kkbox.git orpheus_base/modules/kkbox && pip install -r orpheus_base/requirements.txt"
+    buildCommand: "./build.sh"
     startCommand: "gunicorn app:app --timeout 300 --workers 1"
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
+      - key: KKBOX_EMAIL
+        value: "15cb1b133c@emailnox.live"
+      - key: KKBOX_PASSWORD
+        value: "Mexico_2026"
+      - key: KKBOX_KC1_KEY
+        value: "7f1a68f00b747f4ac1469c72e7ef492c"
+      - key: KKBOX_SECRET_KEY
+        value: "0ff29b7c9bd8fb60a3abd6b3d402b02c"
