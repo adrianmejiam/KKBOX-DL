@@ -30,7 +30,7 @@ def ensure_orpheus_installed():
             print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera o actualiza settings.json preservando la estructura oficial y forzando metadatos."""
+    """Genera o actualiza settings.json preservando la estructura oficial y forzando carátulas."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
@@ -58,6 +58,7 @@ def setup_orpheus_config(task_download_dir):
     settings["global"]["download_quality"] = "hifi"
     settings["global"]["main_resolution"] = 2048
     settings["global"]["search_limit"] = 10
+    # Forzar la incrustación de carátula en alta calidad
     settings["global"]["embed_cover"] = True
     settings["global"]["save_cover"] = True
     settings["global"]["save_lyrics"] = True
@@ -104,13 +105,12 @@ def run_download_task(task_id, url):
             raise Exception("No se pudo cargar el script de descarga.")
 
         download_status[task_id]["progress"] = 35
-        download_status[task_id]["status"] = "Descargando flujo FLAC Lossless..."
+        download_status[task_id]["status"] = "Descargando audio y carátula en alta calidad..."
         add_log(f"[+] Procesando URL: {url}")
         
         cmd = ["python3", script_path, url]
         process = subprocess.Popen(cmd, cwd=ORPHEUS_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
-        # Lectura fluida línea por línea con actualización de progreso constante
         for line in process.stdout:
             cleaned_line = line.strip()
             if cleaned_line:
@@ -123,8 +123,8 @@ def run_download_task(task_id, url):
         process.wait()
 
         download_status[task_id]["progress"] = 90
-        download_status[task_id]["status"] = "Buscando archivo de audio generado..."
-        add_log("[+] Localizando archivo FLAC generado...")
+        download_status[task_id]["status"] = "Verificando archivo FLAC y carátula..."
+        add_log("[+] Localizando archivo de audio...")
         
         flac_file = None
         search_dirs = [task_download_dir, DOWNLOAD_FOLDER, ORPHEUS_DIR]
@@ -145,7 +145,6 @@ def run_download_task(task_id, url):
             last_log = logs[-1] if logs else "Sin salida"
             raise Exception(f"No se generó el archivo FLAC. Último log: {last_log}")
 
-        # Mantener el nombre original del archivo FLAC generado por OrpheusDL
         original_filename = os.path.basename(flac_file)
         final_filepath = os.path.join(DOWNLOAD_FOLDER, original_filename)
         
@@ -154,11 +153,11 @@ def run_download_task(task_id, url):
                 os.remove(final_filepath)
             os.replace(flac_file, final_filepath)
 
-        add_log(f"[+] Archivo listo con nombre original: {original_filename}")
+        add_log(f"[+] Archivo listo con carátula integrada: {original_filename}")
 
         download_status[task_id] = {
             "progress": 100,
-            "status": "¡Descarga FLAC completada con éxito!",
+            "status": "¡Descarga completada con éxito!",
             "download_url": f"/get-file/{original_filename}",
             "logs": logs
         }
