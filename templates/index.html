@@ -45,8 +45,12 @@
     </footer>
 
     <script>
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
         async function startDownload() {
-            const urlInput = document.getElementById('url').value;
+            const urlInput = document.getElementById('url').value.trim();
             const btn = document.getElementById('downloadBtn');
             const progressContainer = document.getElementById('progressContainer');
             const progressBar = document.getElementById('progressBar');
@@ -75,6 +79,10 @@
                 });
                 const result = await response.json();
                 
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
                 if (result.task_id) {
                     const eventSource = new EventSource(`/check-progress/${result.task_id}`);
 
@@ -85,9 +93,9 @@
                         percentText.innerText = `${data.progress}%`;
                         statusText.innerText = data.status;
 
-                        // Imprimir registros en tiempo real dentro de la consola
+                        // Imprimir registros escapados en tiempo real
                         if (data.logs && data.logs.length > 0) {
-                            consoleBox.innerHTML = data.logs.map(log => `<div>${log}</div>`).join('');
+                            consoleBox.innerHTML = data.logs.map(log => `<div>${escapeHtml(log)}</div>`).join('');
                             consoleBox.scrollTop = consoleBox.scrollHeight;
                         }
 
@@ -108,14 +116,21 @@
                             eventSource.close();
                             btn.disabled = false;
                             btn.classList.remove('opacity-50');
-                            consoleBox.innerHTML += `<div class="text-red-400 font-bold">[✖] Error: ${data.status}</div>`;
+                            consoleBox.innerHTML += `<div class="text-red-400 font-bold">[✖] Error: ${escapeHtml(data.status)}</div>`;
                             consoleBox.scrollTop = consoleBox.scrollHeight;
                         }
+                    };
+
+                    eventSource.onerror = function() {
+                        eventSource.close();
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
+                        statusText.innerText = "Error en la conexión EventSource.";
                     };
                 }
             } catch (err) {
                 console.error("Error:", err);
-                statusText.innerText = "Error de comunicación con el servidor.";
+                statusText.innerText = err.message || "Error de comunicación con el servidor.";
                 btn.disabled = false;
                 btn.classList.remove('opacity-50');
             }
