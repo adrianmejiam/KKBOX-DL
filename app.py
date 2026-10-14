@@ -97,7 +97,6 @@ def run_download_task(task_id, url):
 
         ensure_orpheus_installed()
         
-        # Cada tarea utiliza una carpeta aislada y única basada en su task_id
         task_download_dir = os.path.join(DOWNLOAD_FOLDER, task_id)
         os.makedirs(task_download_dir, exist_ok=True)
 
@@ -123,7 +122,7 @@ def run_download_task(task_id, url):
                 add_log(f"[MOTOR] {cleaned_line}")
                 if "Downloading" in cleaned_line:
                     download_status[task_id]["progress"] = 60
-                elif "100%" in cleaned_line:
+                elif "100%" in cleaned_line or "skipped" in cleaned_line.lower():
                     download_status[task_id]["progress"] = 85
         
         process.wait()
@@ -133,15 +132,19 @@ def run_download_task(task_id, url):
         add_log("[+] Localizando archivo de audio descargado...")
         
         audio_file = None
-        # Búsqueda exclusiva en la carpeta de la tarea actual para evitar arrastrar archivos viejos
-        if os.path.exists(task_download_dir):
-            for root, dirs, files in os.walk(task_download_dir):
-                for file in files:
-                    if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
-                        audio_file = os.path.join(root, file)
+        search_dirs = [task_download_dir, DOWNLOAD_FOLDER, ORPHEUS_DIR]
+        
+        for s_dir in search_dirs:
+            if os.path.exists(s_dir):
+                for root, dirs, files in os.walk(s_dir):
+                    for file in files:
+                        if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
+                            audio_file = os.path.join(root, file)
+                            break
+                    if audio_file:
                         break
-                if audio_file:
-                    break
+            if audio_file:
+                break
 
         if not audio_file:
             last_log = logs[-1] if logs else "Sin salida"
@@ -149,14 +152,15 @@ def run_download_task(task_id, url):
 
         original_filename = os.path.basename(audio_file)
         
-        # Prefijo único basado en task_id para evitar conflictos de nombres
-        safe_filename = f"{task_id}_{original_filename}"
-        final_filepath = os.path.join(DOWNLOAD_FOLDER, safe_filename)
-        
-        if audio_file != final_filepath:
-            if os.path.exists(final_filepath):
-                os.remove(final_filepath)
-            os.replace(audio_file, final_filepath)
+        if os.path.dirname(audio_file) == DOWNLOAD_FOLDER:
+            safe_filename = original_filename
+        else:
+            safe_filename = f"{task_id}_{original_filename}"
+            final_filepath = os.path.join(DOWNLOAD_FOLDER, safe_filename)
+            if audio_file != final_filepath:
+                if os.path.exists(final_filepath):
+                    os.remove(final_filepath)
+                os.replace(audio_file, final_filepath)
 
         add_log(f"[+] Archivo listo con carátula integrada: {safe_filename}")
 
