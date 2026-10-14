@@ -31,24 +31,27 @@ cd ..
 # 5. Inyectar los accesos y parámetros de desencripción en el settings.json
 echo "Escribiendo archivo de configuración config/settings.json..."
 mkdir -p orpheusdl/config
+
+EMAIL="${KKBOX_EMAIL:-15cb1b133c@emailnox.live}"
+PASS="${KKBOX_PASSWORD:-Mexico_2026}"
+KC1="${KKBOX_KC1_KEY:-7f1a68f00b747f4ac1469c72e7ef492c}"
+SECRET="${KKBOX_SECRET_KEY:-0ff29b7c9bd8fb60a3abd6b3d402b02c}"
+
 cat <<EOT > orpheusdl/config/settings.json
 {
     "global": {
         "download_path": "../downloads/",
-        "download_quality": "high",
+        "download_quality": "hifi",
         "main_resolution": 2048,
         "search_limit": 10
     },
-    "kkbox": {
-        "email": "${KKBOX_EMAIL}",
-        "password": "${KKBOX_PASSWORD}",
-        "kc1_key": "${KKBOX_KC1_KEY}",
-        "secret_key": "${KKBOX_SECRET_KEY}"
+    "modules": {
+        "kkbox": {
+            "email": "${EMAIL}",
+            "password": "${PASS}",
+            "kc1_key": "${KC1}",
+            "secret_key": "${SECRET}"
+        }
     }
 }
 EOT
-
-# Crear el directorio físico donde se van a compilar las descargas en tránsito
-mkdir -p downloads
-
-echo "=== Entorno preparado exitosamente para adrianmejiam ==="
