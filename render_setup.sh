@@ -27,7 +27,7 @@ pip install --upgrade pip
 if [ -f "orpheusdl/requirements.txt" ]; then
     pip install -r orpheusdl/requirements.txt
 fi
-pip install flask gunicorn mutagen yt-dlp Pillow
+pip install flask gunicorn mutagen yt-dlp Pillow ffmpeg-python
 
 # 4. Inicializar nativamente la base de configuración de OrpheusDL
 echo "Inicializando configuraciones base..."
