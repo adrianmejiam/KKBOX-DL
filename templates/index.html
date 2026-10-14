@@ -3,27 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KKBOX FLAC Downloader</title>
+    <title>KKBOX Downloader</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
     <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700">
+        <!-- Encabezado -->
         <div class="flex items-center justify-between mb-2">
             <h1 class="text-xl font-bold text-indigo-400">KKBOX Downloader</h1>
             <span class="bg-green-900 text-green-300 text-xs font-bold px-2.5 py-0.5 rounded border border-green-600">FLAC Lossless</span>
         </div>
         <p class="text-xs text-gray-400 mb-6">Desarrollado por <a href="https://github.com/adrianmejiam" target="_blank" class="text-indigo-400 hover:underline font-semibold">adrianmejiam</a></p>
 
+        <!-- Campo de Entrada -->
         <div class="mb-4">
             <label class="block text-gray-300 text-sm font-bold mb-2">URL de KKBOX (Canción / Playlist / Álbum):</label>
             <input type="text" id="url" placeholder="https://www.kkbox.com/..." class="bg-gray-900 border border-gray-700 rounded-lg w-full py-2 px-3 text-gray-200 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
 
-        <button id="downloadBtn" onclick="startDownload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg w-full transition duration-200 focus:outline-none shadow-md">
-            Descargar FLAC en Máxima Calidad
+        <!-- Opción para Descarga Automática -->
+        <div class="flex items-center justify-between mb-5 bg-gray-900 p-3 rounded-lg border border-gray-700">
+            <span class="text-xs text-gray-300 font-medium">Descargar automáticamente al terminar</span>
+            <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="autoDownloadToggle" class="sr-only peer" checked>
+                <div class="relative w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+        </div>
+
+        <!-- Botón de Acción Principal -->
+        <button id="downloadBtn" onclick="startDownload()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg w-full transition duration-200 focus:outline-none shadow-md text-sm">
+            Descargar FLAC
         </button>
 
-        <!-- Contenedor de Progreso y Consola Terminal -->
+        <!-- Contenedor de Progreso y Consola -->
         <div id="progressContainer" class="mt-6 hidden">
             <div class="flex justify-between mb-1">
                 <span id="statusText" class="text-xs font-semibold text-gray-300">Iniciando...</span>
@@ -34,8 +46,28 @@
             </div>
 
             <!-- Ventana de Consola / Terminal -->
-            <div class="bg-black border border-gray-700 rounded-lg p-3 h-44 overflow-y-auto font-mono text-xs text-green-400 shadow-inner" id="consoleBox">
+            <div class="bg-black border border-gray-700 rounded-lg p-3 h-44 overflow-y-auto font-mono text-xs text-green-400 shadow-inner mb-4" id="consoleBox">
                 <div class="text-gray-500">$ esperando solicitud de descarga...</div>
+            </div>
+
+            <!-- Botón de Descarga Manual (Si auto-descarga está deshabilitada) -->
+            <div id="manualDownloadContainer" class="hidden">
+                <a id="manualDownloadBtn" href="#" class="block text-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg transition duration-200 text-sm shadow-md">
+                    ⬇️ Guardar Archivo FLAC
+                </a>
+            </div>
+        </div>
+
+        <!-- Sección de Donaciones Monetarias -->
+        <div class="mt-8 pt-6 border-t border-gray-700 text-center">
+            <p class="text-xs text-gray-400 mb-2">☕ ¿Te sirvió la aplicación? Apoya la mantención del servidor:</p>
+            <div class="flex justify-center space-x-3">
+                <a href="https://paypal.me/" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-gray-900 font-bold text-xs px-3 py-1.5 rounded transition duration-200">
+                    💳 Donar por PayPal
+                </a>
+                <a href="https://buymeacoffee.com/" target="_blank" class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold text-xs px-3 py-1.5 rounded transition duration-200">
+                    ☕ Buy Me a Coffee
+                </a>
             </div>
         </div>
     </div>
@@ -57,6 +89,9 @@
             const statusText = document.getElementById('statusText');
             const percentText = document.getElementById('percentText');
             const consoleBox = document.getElementById('consoleBox');
+            const autoDownload = document.getElementById('autoDownloadToggle').checked;
+            const manualDownloadContainer = document.getElementById('manualDownloadContainer');
+            const manualDownloadBtn = document.getElementById('manualDownloadBtn');
 
             if (!urlInput) {
                 alert("Por favor ingresa una URL válida de KKBOX.");
@@ -66,6 +101,7 @@
             btn.disabled = true;
             btn.classList.add('opacity-50');
             progressContainer.classList.remove('hidden');
+            manualDownloadContainer.classList.add('hidden');
             progressBar.style.width = '0%';
             percentText.innerText = '0%';
             statusText.innerText = 'Iniciando conexión...';
@@ -93,7 +129,6 @@
                         percentText.innerText = `${data.progress}%`;
                         statusText.innerText = data.status;
 
-                        // Imprimir registros escapados en tiempo real
                         if (data.logs && data.logs.length > 0) {
                             consoleBox.innerHTML = data.logs.map(log => `<div>${escapeHtml(log)}</div>`).join('');
                             consoleBox.scrollTop = consoleBox.scrollHeight;
@@ -103,15 +138,22 @@
                             eventSource.close();
                             btn.disabled = false;
                             btn.classList.remove('opacity-50');
-                            consoleBox.innerHTML += '<div class="text-green-300 font-bold">[✔] ¡Descarga completada! Transfiriendo archivo al navegador...</div>';
+                            
+                            if (autoDownload) {
+                                consoleBox.innerHTML += '<div class="text-green-300 font-bold">[✔] ¡Descarga completada! Transfiriendo archivo al navegador...</div>';
+                                const link = document.createElement('a');
+                                link.href = data.download_url;
+                                link.setAttribute('download', '');
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+                            } else {
+                                consoleBox.innerHTML += '<div class="text-green-300 font-bold">[✔] ¡Descarga completada! Presiona el botón de abajo para guardar.</div>';
+                                manualDownloadBtn.href = data.download_url;
+                                manualDownloadContainer.classList.remove('hidden');
+                            }
                             consoleBox.scrollTop = consoleBox.scrollHeight;
 
-                            const link = document.createElement('a');
-                            link.href = data.download_url;
-                            link.setAttribute('download', '');
-                            document.body.appendChild(link);
-                            link.click();
-                            link.remove();
                         } else if (data.error) {
                             eventSource.close();
                             btn.disabled = false;
