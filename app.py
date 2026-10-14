@@ -30,7 +30,7 @@ def ensure_orpheus_installed():
             print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera o actualiza settings.json forzando carátulas y patrones de nombres únicos por pista."""
+    """Genera o actualiza settings.json preservando la estructura oficial y forzando carátulas."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
@@ -58,12 +58,6 @@ def setup_orpheus_config(task_download_dir):
     settings["global"]["download_quality"] = "hifi"
     settings["global"]["main_resolution"] = 2048
     settings["global"]["search_limit"] = 10
-    
-    # Añadir patrones de nombres únicos para evitar que canciones de álbumes se sobrescriban
-    settings["global"]["track_format"] = "{track_number} - {artist} - {name}"
-    settings["global"]["album_format"] = "{album_artist}/{album}/{track_number} - {name}"
-    settings["global"]["playlist_format"] = "Playlists/{playlist_name}/{track_number} - {artist} - {name}"
-
     # Forzar la incrustación de carátula en alta calidad
     settings["global"]["embed_cover"] = True
     settings["global"]["save_cover"] = True
@@ -111,7 +105,7 @@ def run_download_task(task_id, url):
             raise Exception("No se pudo cargar el script de descarga.")
 
         download_status[task_id]["progress"] = 35
-        download_status[task_id]["status"] = "Descargando audio y carátulas..."
+        download_status[task_id]["status"] = "Descargando audio y carátula en alta calidad..."
         add_log(f"[+] Procesando URL: {url}")
         
         cmd = ["python3", script_path, url]
@@ -129,42 +123,42 @@ def run_download_task(task_id, url):
         process.wait()
 
         download_status[task_id]["progress"] = 90
-        download_status[task_id]["status"] = "Verificando archivos FLAC..."
-        add_log("[+] Localizando archivos descargados...")
+        download_status[task_id]["status"] = "Verificando archivo FLAC y carátula..."
+        add_log("[+] Localizando archivo de audio...")
         
-        flac_files = []
-        search_dirs = [task_download_dir, DOWNLOAD_FOLDER]
+        flac_file = None
+        search_dirs = [task_download_dir, DOWNLOAD_FOLDER, ORPHEUS_DIR]
         
         for s_dir in search_dirs:
             if os.path.exists(s_dir):
                 for root, dirs, files in os.walk(s_dir):
                     for file in files:
                         if file.endswith('.flac'):
-                            flac_files.append(os.path.join(root, file))
+                            flac_file = os.path.join(root, file)
+                            break
+                    if flac_file:
+                        break
+            if flac_file:
+                break
 
-        if not flac_files:
+        if not flac_file:
             last_log = logs[-1] if logs else "Sin salida"
-            raise Exception(f"No se generó ningún archivo FLAC. Último log: {last_log}")
+            raise Exception(f"No se generó el archivo FLAC. Último log: {last_log}")
 
-        # Si es un álbum/playlist, empaquetamos o seleccionamos el primero o el más reciente, 
-        # o manejamos el flujo para que devuelva el archivo principal o un .zip (en este caso tomamos el último o el primero descargado).
-        target_flac = flac_files[0]
-        original_filename = os.path.basename(target_flac)
+        original_filename = os.path.basename(flac_file)
+        final_filepath = os.path.join(DOWNLOAD_FOLDER, original_filename)
         
-        # Para evitar colisiones si hay archivos con el mismo nombre en diferentes subcarpetas, copiamos a la raíz de DOWNLOAD_FOLDER con un sufijo único si es necesario
-        final_filepath = os.path.join(DOWNLOAD_FOLDER, f"{task_id}_{original_filename}")
-        
-        if target_flac != final_filepath:
-            import shutil
-            shutil.copy2(target_flac, final_filepath)
+        if flac_file != final_filepath:
+            if os.path.exists(final_filepath):
+                os.remove(final_filepath)
+            os.replace(flac_file, final_filepath)
 
-        final_filename_relative = os.path.basename(final_filepath)
-        add_log(f"[+] Archivo listo: {original_filename}")
+        add_log(f"[+] Archivo listo con carátula integrada: {original_filename}")
 
         download_status[task_id] = {
             "progress": 100,
             "status": "¡Descarga completada con éxito!",
-            "download_url": f"/get-file/{final_filename_relative}",
+            "download_url": f"/get-file/{original_filename}",
             "logs": logs
         }
 
@@ -206,9 +200,7 @@ def get_progress_json(task_id):
 
 @app.route('/get-file/<filename>')
 def get_file(filename):
-    # Seguridad básica contra path traversal
-    safe_filename = os.path.basename(filename)
-    return send_from_directory(DOWNLOAD_FOLDER, safe_filename, as_attachment=True, mimetype='audio/flac')
+    return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True, mimetype='audio/flac')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
