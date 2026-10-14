@@ -30,34 +30,56 @@ def ensure_orpheus_installed():
             print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera la configuración interna con la estructura exacta exigida por OrpheusDL."""
+    """Genera o actualiza settings.json preservando la estructura oficial y versión de OrpheusDL."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
 
-    # Utiliza las variables de entorno inyectadas o valores por defecto
+    script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
+
+    # Si no existe el settings.json oficial, pedirle a OrpheusDL que lo cree nativamente
+    if not os.path.exists(config_path) and os.path.exists(script_path):
+        try:
+            subprocess.run(["python3", script_path, "settings", "refresh"], cwd=ORPHEUS_DIR, check=True)
+        except Exception as e:
+            print(f"Aviso al refrescar configuraciones base: {e}")
+
+    # Cargar la configuración oficial existente o inicializar un diccionario vacío
+    settings = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                settings = json.load(f)
+        except Exception:
+            settings = {}
+
+    # Asegurar y actualizar configuraciones globales
+    if "global" not in settings:
+        settings["global"] = {}
+    
+    settings["global"]["download_path"] = task_download_dir
+    settings["global"]["download_quality"] = "hifi"
+    settings["global"]["main_resolution"] = 2048
+    settings["global"]["search_limit"] = 10
+
+    # Obtener credenciales de variables de entorno o valores por defecto
     email = os.environ.get("KKBOX_EMAIL", "15cb1b133c@emailnox.live")
     password = os.environ.get("KKBOX_PASSWORD", "Mexico_2026")
     kc1_key = os.environ.get("KKBOX_KC1_KEY", "7f1a68f00b747f4ac1469c72e7ef492c")
     secret_key = os.environ.get("KKBOX_SECRET_KEY", "0ff29b7c9bd8fb60a3abd6b3d402b02c")
 
-    settings = {
-        "global": {
-            "download_quality": "hifi",
-            "download_path": task_download_dir,
-            "main_resolution": 2048,
-            "search_limit": 10
-        },
-        "modules": {
-            "kkbox": {
-                "email": email,
-                "password": password,
-                "kc1_key": kc1_key,
-                "secret_key": secret_key
-            }
-        }
+    # Asegurar y actualizar la sección de módulos y KKBOX
+    if "modules" not in settings:
+        settings["modules"] = {}
+
+    settings["modules"]["kkbox"] = {
+        "email": email,
+        "password": password,
+        "kc1_key": kc1_key,
+        "secret_key": secret_key
     }
 
+    # Guardar el archivo de configuración limpio y actualizado
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=4)
 
