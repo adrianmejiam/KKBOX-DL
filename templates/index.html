@@ -120,25 +120,47 @@
                 }
 
                 if (result.task_id) {
-                    const eventSource = new EventSource(`/check-progress/${result.task_id}`);
+                    pollProgress(result.task_id);
+                }
+            } catch (err) {
+                console.error("Error:", err);
+                statusText.innerText = err.message || "Error de comunicación con el servidor.";
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
 
-                    eventSource.onmessage = function(event) {
-                        const data = JSON.parse(event.data);
-                        
-                        progressBar.style.width = `${data.progress}%`;
-                        percentText.innerText = `${data.progress}%`;
-                        statusText.innerText = data.status;
+        function pollProgress(taskId) {
+            const btn = document.getElementById('downloadBtn');
+            const progressBar = document.getElementById('progressBar');
+            const statusText = document.getElementById('statusText');
+            const percentText = document.getElementById('percentText');
+            const consoleBox = document.getElementById('consoleBox');
+            const autoDownload = document.getElementById('autoDownloadToggle').checked;
+            const manualDownloadContainer = document.getElementById('manualDownloadContainer');
+            const manualDownloadBtn = document.getElementById('manualDownloadBtn');
 
-                        if (data.logs && data.logs.length > 0) {
-                            consoleBox.innerHTML = data.logs.map(log => `<div>${escapeHtml(log)}</div>`).join('');
-                            consoleBox.scrollTop = consoleBox.scrollHeight;
-                        }
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/get-progress-json/${taskId}`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+
+                    progressBar.style.width = `${data.progress}%`;
+                    percentText.innerText =`${data.progress}%`;
+                    statusText.innerText = data.status;
+
+                    if (data.logs && data.logs.length > 0) {
+                        consoleBox.innerHTML = data.logs.map(log => `<div>${escapeHtml(log)}</div>`).join('');
+                        consoleBox.scrollTop = consoleBox.scrollHeight;
+                    }
+
+                    if (data.progress >= 100 || data.error) {
+                        clearInterval(interval);
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
 
                         if (data.download_url) {
-                            eventSource.close();
-                            btn.disabled = false;
-                            btn.classList.remove('opacity-50');
-                            
                             if (autoDownload) {
                                 consoleBox.innerHTML += '<div class="text-green-300 font-bold">[✔] ¡Descarga completada! Transfiriendo archivo al navegador...</div>';
                                 const link = document.createElement('a');
@@ -152,30 +174,15 @@
                                 manualDownloadBtn.href = data.download_url;
                                 manualDownloadContainer.classList.remove('hidden');
                             }
-                            consoleBox.scrollTop = consoleBox.scrollHeight;
-
                         } else if (data.error) {
-                            eventSource.close();
-                            btn.disabled = false;
-                            btn.classList.remove('opacity-50');
                             consoleBox.innerHTML += `<div class="text-red-400 font-bold">[✖] Error: ${escapeHtml(data.status)}</div>`;
-                            consoleBox.scrollTop = consoleBox.scrollHeight;
                         }
-                    };
-
-                    eventSource.onerror = function() {
-                        eventSource.close();
-                        btn.disabled = false;
-                        btn.classList.remove('opacity-50');
-                        statusText.innerText = "Error en la conexión EventSource.";
-                    };
+                        consoleBox.scrollTop = consoleBox.scrollHeight;
+                    }
+                } catch (e) {
+                    console.error("Error en sondeo:", e);
                 }
-            } catch (err) {
-                console.error("Error:", err);
-                statusText.innerText = err.message || "Error de comunicación con el servidor.";
-                btn.disabled = false;
-                btn.classList.remove('opacity-50');
-            }
+            }, 1500); // Consulta cada 1.5 segundos de forma segura
         }
     </script>
 </body>
