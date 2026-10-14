@@ -4,7 +4,7 @@ import time
 import subprocess
 import threading
 import traceback
-from flask import Flask, render_template, request, Response, send_from_directory, jsonify
+from flask import Flask, render_template, request, send_from_directory, jsonify
 
 app = Flask(__name__)
 BASE_DIR = app.root_path
@@ -126,7 +126,6 @@ def run_download_task(task_id, url):
         final_filename = f"kkbox_lossless_{task_id}.flac"
         final_filepath = os.path.join(DOWNLOAD_FOLDER, final_filename)
         
-        # Mover o renombrar el archivo encontrado al directorio general de descargas
         if os.path.exists(flac_file) and flac_file != final_filepath:
             os.replace(flac_file, final_filepath)
 
@@ -169,19 +168,11 @@ def start_download():
 
     return jsonify({"task_id": task_id})
 
-@app.route('/check-progress/<task_id>')
-def check_progress(task_id):
-    def generate():
-        while task_id in download_status:
-            status_data = download_status[task_id]
-            yield f"data: {json.dumps(status_data)}\n\n"
-            if status_data.get("progress") >= 100 or status_data.get("error"):
-                break
-            time.sleep(1)
-            # Enviar latido (ping) para mantener la conexión activa en proxies y cloud providers
-            yield ": ping\n\n"
-
-    return Response(generate(), mimetype='text/event-stream')
+@app.route('/get-progress-json/<task_id>')
+def get_progress_json(task_id):
+    if task_id in download_status:
+        return jsonify(download_status[task_id])
+    return jsonify({"error": "Tarea no encontrada"}), 404
 
 @app.route('/get-file/<filename>')
 def get_file(filename):
