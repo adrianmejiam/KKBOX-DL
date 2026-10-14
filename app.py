@@ -3,11 +3,12 @@ import json
 import time
 import subprocess
 import threading
+import traceback
 from flask import Flask, render_template, request, Response, send_from_directory, jsonify
 
 app = Flask(__name__)
 BASE_DIR = app.root_path
-ORPHEUS_DIR = os.path.join(BASE_DIR, 'orpheus_base')
+ORPHEUS_DIR = os.path.join(BASE_DIR, 'orpheusdl')
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'downloads')
 
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -29,20 +30,30 @@ def ensure_orpheus_installed():
             print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera la configuración interna con tus credenciales de KKBOX."""
+    """Genera la configuración interna con las credenciales de KKBOX."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
 
+    # Utiliza las variables de entorno inyectadas o valores por defecto
+    email = os.environ.get("KKBOX_EMAIL", "15cb1b133c@emailnox.live")
+    password = os.environ.get("KKBOX_PASSWORD", "Mexico_2026")
+    kc1_key = os.environ.get("KKBOX_KC1_KEY", "7f1a68f00b747f4ac1469c72e7ef492c")
+    secret_key = os.environ.get("KKBOX_SECRET_KEY", "0ff29b7c9bd8fb60a3abd6b3d402b02c")
+
     settings = {
-        "download_quality": "hifi",
-        "download_path": task_download_dir,
+        "global": {
+            "download_quality": "hifi",
+            "download_path": task_download_dir,
+            "main_resolution": 2048,
+            "search_limit": 10
+        },
         "modules": {
             "kkbox": {
-                "email": "15cb1b133c@emailnox.live",
-                "password": "Mexico_2026",
-                "kc1_key": "7f1a68f00b747f4ac1469c72e7ef492c",
-                "secret_key": "0ff29b7c9bd8fb60a3abd6b3d402b02c"
+                "email": email,
+                "password": password,
+                "kc1_key": kc1_key,
+                "secret_key": secret_key
             }
         }
     }
@@ -86,7 +97,7 @@ def run_download_task(task_id, url):
                 add_log(f"[MOTOR] {cleaned_line}")
                 if "100%" in cleaned_line or "Downloading" in cleaned_line:
                     download_status[task_id]["progress"] = 65
-            
+        
         process.wait()
 
         download_status[task_id]["progress"] = 85
@@ -114,7 +125,10 @@ def run_download_task(task_id, url):
 
         final_filename = f"kkbox_lossless_{task_id}.flac"
         final_filepath = os.path.join(DOWNLOAD_FOLDER, final_filename)
-        os.rename(flac_file, final_filepath)
+        
+        # Mover o renombrar el archivo encontrado al directorio general de descargas
+        if os.path.exists(flac_file) and flac_file != final_filepath:
+            os.replace(flac_file, final_filepath)
 
         add_log(f"[+] Archivo listado correctamente: {final_filename}")
 
@@ -126,6 +140,8 @@ def run_download_task(task_id, url):
         }
 
     except Exception as e:
+        error_trace = traceback.format_exc()
+        print(f"[ERROR CRÍTICO] {error_trace}")
         download_status[task_id] = {
             "progress": 100, 
             "status": f"Error: {str(e)}", 
@@ -139,7 +155,7 @@ def index():
 
 @app.route('/start-download', methods=['POST'])
 def start_download():
-    data = request.json
+    data = request.json or {}
     url = data.get('url')
     if not url:
         return jsonify({"error": "No se proporcionó ninguna URL"}), 400
@@ -161,7 +177,9 @@ def check_progress(task_id):
             yield f"data: {json.dumps(status_data)}\n\n"
             if status_data.get("progress") >= 100 or status_data.get("error"):
                 break
-            time.sleep(0.5)
+            time.sleep(1)
+            # Enviar latido (ping) para mantener la conexión activa en proxies y cloud providers
+            yield ": ping\n\n"
 
     return Response(generate(), mimetype='text/event-stream')
 
