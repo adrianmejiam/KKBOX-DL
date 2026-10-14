@@ -60,10 +60,28 @@
 
         <!-- Sección de Donaciones Monetarias -->
         <div class="mt-8 pt-6 border-t border-gray-700 text-center">
-            <p class="text-xs text-gray-400 mb-2">☕ ¿Te sirvió la aplicación? Apoya la mantención del servidor:</p>
+            <p class="text-xs text-gray-400 mb-3">☕ ¿Te sirvió la aplicación? Apoya la mantención del servidor:</p>
+            
+            <!-- Widget de Transferencia SPEI -->
+            <div class="bg-gray-900 border border-gray-700 p-3.5 rounded-lg mb-3 text-left space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-indigo-400">Transferencia SPEI (México)</span>
+                    <button onclick="copyClabe()" class="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded transition font-semibold">Copiar CLABE</button>
+                </div>
+                <div class="text-xs text-gray-300 space-y-1">
+                    <div><span class="text-gray-500 font-semibold">Institución:</span> Mercado Pago W</div>
+                    <div><span class="text-gray-500 font-semibold">Beneficiario:</span> Pedro Adrian Mejia Muñoz</div>
+                    <div>
+                        <span class="text-gray-500 font-semibold">CLABE:</span> 
+                        <span id="clabeText" class="font-mono text-indigo-300 font-bold select-all">722969010736762461</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones Externos Opcionales -->
             <div class="flex justify-center space-x-3">
                 <a href="https://paypal.me/" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-gray-900 font-bold text-xs px-3 py-1.5 rounded transition duration-200">
-                    💳 Donar por PayPal
+                    💳 PayPal
                 </a>
                 <a href="https://buymeacoffee.com/" target="_blank" class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold text-xs px-3 py-1.5 rounded transition duration-200">
                     ☕ Buy Me a Coffee
@@ -79,6 +97,15 @@
     <script>
         function escapeHtml(text) {
             return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function copyClabe() {
+            const clabe = "722969010736762461";
+            navigator.clipboard.writeText(clabe).then(() => {
+                alert("¡CLABE copiada al portapapeles!");
+            }).catch(err => {
+                console.error("Error al copiar: ", err);
+            });
         }
 
         async function startDownload() {
@@ -147,7 +174,7 @@
                     const data = await res.json();
 
                     progressBar.style.width = `${data.progress}%`;
-                    percentText.innerText =`${data.progress}%`;
+                    percentText.innerText = `${data.progress}%`;
                     statusText.innerText = data.status;
 
                     if (data.logs && data.logs.length > 0) {
@@ -182,7 +209,7 @@
                 } catch (e) {
                     console.error("Error en sondeo:", e);
                 }
-            }, 1500); // Consulta cada 1.5 segundos de forma segura
+            }, 1500);
         }
     </script>
 </body>
