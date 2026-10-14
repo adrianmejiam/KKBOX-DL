@@ -4,6 +4,7 @@ import time
 import subprocess
 import threading
 import traceback
+import shutil
 from flask import Flask, render_template, request, send_from_directory, jsonify
 
 app = Flask(__name__)
@@ -92,7 +93,6 @@ def run_download_task(task_id, url):
 
         ensure_orpheus_installed()
         
-        # Carpeta única y exclusiva para esta tarea específica
         task_download_dir = os.path.join(DOWNLOAD_FOLDER, task_id)
         os.makedirs(task_download_dir, exist_ok=True)
 
@@ -128,29 +128,20 @@ def run_download_task(task_id, url):
         add_log("[+] Localizando archivo de audio descargado...")
         
         audio_file = None
-        
-        # Búsqueda estricta: Priorizamos el directorio exclusivo de esta tarea ordenado por fecha de modificación reciente
         candidate_files = []
-        if os.path.exists(task_download_dir):
-            for root, dirs, files in os.walk(task_download_dir):
-                for file in files:
-                    if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
-                        full_path = os.path.join(root, file)
-                        candidate_files.append((full_path, os.path.getmtime(full_path)))
-
-        # Si no hay archivos en la carpeta de la tarea, buscamos de manera general pero tomando el más reciente de los últimos segundos
-        if not candidate_files and os.path.exists(DOWNLOAD_FOLDER):
-            for root, dirs, files in os.walk(DOWNLOAD_FOLDER):
-                # Evitamos buscar dentro de otras subcarpetas de task_id antiguas
-                if root != DOWNLOAD_FOLDER and os.path.basename(root) != task_id:
-                    continue
-                for file in files:
-                    if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
-                        full_path = os.path.join(root, file)
-                        candidate_files.append((full_path, os.path.getmtime(full_path)))
+        
+        # Búsqueda global y recursiva en todas las carpetas posibles de la app
+        search_roots = [task_download_dir, DOWNLOAD_FOLDER, ORPHEUS_DIR]
+        for s_dir in search_roots:
+            if os.path.exists(s_dir):
+                for root, dirs, files in os.walk(s_dir):
+                    for file in files:
+                        if file.lower().endswith(('.flac', '.m4a', '.mp3', '.ogg', '.wav')):
+                            full_path = os.path.join(root, file)
+                            candidate_files.append((full_path, os.path.getmtime(full_path)))
 
         if candidate_files:
-            # Ordenar por fecha de modificación (el más reciente primero) para asegurar que obtenemos el de la petición actual
+            # Ordenar estrictamente por fecha de modificación: el archivo más reciente (el que se acaba de descargar) queda primero
             candidate_files.sort(key=lambda x: x[1], reverse=True)
             audio_file = candidate_files[0][0]
 
@@ -160,15 +151,13 @@ def run_download_task(task_id, url):
 
         original_filename = os.path.basename(audio_file)
         
-        # Asignamos un nombre único absoluto combinando el task_id con el nombre real de la pista
+        # Generar nombre único para la entrega web combinando el task_id con el nombre real de la pista
         safe_filename = f"{task_id}_{original_filename}"
         final_filepath = os.path.join(DOWNLOAD_FOLDER, safe_filename)
         
         if audio_file != final_filepath:
             if os.path.exists(final_filepath):
                 os.remove(final_filepath)
-            # Copiamos o movemos el archivo al directorio principal con su nombre único de tarea
-            import shutil
             shutil.copy(audio_file, final_filepath)
 
         add_log(f"[+] Archivo listo con carátula integrada: {safe_filename}")
