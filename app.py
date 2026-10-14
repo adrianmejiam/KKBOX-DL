@@ -59,7 +59,7 @@ def setup_orpheus_config(task_download_dir):
     settings["global"]["main_resolution"] = 2048
     settings["global"]["search_limit"] = 10
     
-    # --- CORRECCIÓN: Nombres de archivo únicos basados en número y título para evitar sobrescritura ---
+    # Nombres de archivo únicos basados en número y título para evitar sobrescritura
     settings["global"]["track_format"] = "{track_number} - {artist} - {name}"
     settings["global"]["album_format"] = "{album_artist}/{album}/{track_number} - {name}"
     
@@ -201,7 +201,7 @@ def start_download():
 def get_progress_json(task_id):
     if task_id in download_status:
         return jsonify(download_status[task_id])
-    return jsonify({"error": "Tarea no encontrada"}}, 404
+    return jsonify({"error": "Tarea no encontrada"}), 404
 
 @app.route('/get-file/<filename>')
 def get_file(filename):
