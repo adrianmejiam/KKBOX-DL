@@ -18,8 +18,9 @@ fi
 
 # 3. Instalar todos los requerimientos base del sistema y Flask
 echo "Instalando dependencias de Python..."
-pip install -r orpheusdl/requirements.txt
-pip install flask gunicorn
+pip install --upgrade pip
+pip install --prefer-binary -r orpheusdl/requirements.txt
+pip install --prefer-binary flask gunicorn gevent
 
 # 4. Inicializar nativamente la base de configuración de OrpheusDL
 echo "Inicializando configuraciones base..."
