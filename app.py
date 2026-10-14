@@ -58,7 +58,6 @@ def setup_orpheus_config(task_download_dir):
     settings["global"]["download_quality"] = "hifi"
     settings["global"]["main_resolution"] = 2048
     settings["global"]["search_limit"] = 10
-    # Forzar la inclusión de metadatos, portadas y letras
     settings["global"]["embed_cover"] = True
     settings["global"]["save_cover"] = True
     settings["global"]["save_lyrics"] = True
@@ -105,24 +104,27 @@ def run_download_task(task_id, url):
             raise Exception("No se pudo cargar el script de descarga.")
 
         download_status[task_id]["progress"] = 35
-        download_status[task_id]["status"] = "Descargando flujo FLAC Lossless con metadatos..."
+        download_status[task_id]["status"] = "Descargando flujo FLAC Lossless..."
         add_log(f"[+] Procesando URL: {url}")
         
         cmd = ["python3", script_path, url]
         process = subprocess.Popen(cmd, cwd=ORPHEUS_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
+        # Lectura fluida línea por línea con actualización de progreso constante
         for line in process.stdout:
             cleaned_line = line.strip()
             if cleaned_line:
                 add_log(f"[MOTOR] {cleaned_line}")
-                if "100%" in cleaned_line or "Downloading" in cleaned_line:
-                    download_status[task_id]["progress"] = 65
+                if "Downloading" in cleaned_line:
+                    download_status[task_id]["progress"] = 60
+                elif "100%" in cleaned_line:
+                    download_status[task_id]["progress"] = 85
         
         process.wait()
 
-        download_status[task_id]["progress"] = 85
-        download_status[task_id]["status"] = "Empaquetando archivo de audio..."
-        add_log("[+] Buscando archivo .flac generado...")
+        download_status[task_id]["progress"] = 90
+        download_status[task_id]["status"] = "Buscando archivo de audio generado..."
+        add_log("[+] Localizando archivo FLAC generado...")
         
         flac_file = None
         search_dirs = [task_download_dir, DOWNLOAD_FOLDER, ORPHEUS_DIR]
@@ -131,7 +133,7 @@ def run_download_task(task_id, url):
             if os.path.exists(s_dir):
                 for root, dirs, files in os.walk(s_dir):
                     for file in files:
-                        if file.endswith('.flac') and not file.startswith('kkbox_lossless_'):
+                        if file.endswith('.flac'):
                             flac_file = os.path.join(root, file)
                             break
                     if flac_file:
@@ -143,18 +145,21 @@ def run_download_task(task_id, url):
             last_log = logs[-1] if logs else "Sin salida"
             raise Exception(f"No se generó el archivo FLAC. Último log: {last_log}")
 
-        final_filename = f"kkbox_lossless_{task_id}.flac"
-        final_filepath = os.path.join(DOWNLOAD_FOLDER, final_filename)
+        # Mantener el nombre original del archivo FLAC generado por OrpheusDL
+        original_filename = os.path.basename(flac_file)
+        final_filepath = os.path.join(DOWNLOAD_FOLDER, original_filename)
         
-        if os.path.exists(flac_file) and flac_file != final_filepath:
+        if flac_file != final_filepath:
+            if os.path.exists(final_filepath):
+                os.remove(final_filepath)
             os.replace(flac_file, final_filepath)
 
-        add_log(f"[+] Archivo listado correctamente con metadatos: {final_filename}")
+        add_log(f"[+] Archivo listo con nombre original: {original_filename}")
 
         download_status[task_id] = {
             "progress": 100,
             "status": "¡Descarga FLAC completada con éxito!",
-            "download_url": f"/get-file/{final_filename}",
+            "download_url": f"/get-file/{original_filename}",
             "logs": logs
         }
 
