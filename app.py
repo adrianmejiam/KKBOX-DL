@@ -30,57 +30,36 @@ def ensure_orpheus_installed():
             print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera o actualiza settings.json usando track_filename_format oficial de OrpheusDL."""
+    """Genera settings.json directamente con las claves oficiales evitando bloqueos de refresh."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
-
-    script_path = os.path.join(ORPHEUS_DIR, 'orpheus.py')
-
-    if not os.path.exists(config_path) and os.path.exists(script_path):
-        try:
-            subprocess.run(["python3", script_path, "settings", "refresh"], cwd=ORPHEUS_DIR, check=True)
-        except Exception as e:
-            print(f"Aviso al refrescar configuraciones base: {e}")
-
-    settings = {}
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-        except Exception:
-            settings = {}
-
-    if "global" not in settings:
-        settings["global"] = {}
-    
-    settings["global"]["download_path"] = task_download_dir
-    settings["global"]["download_quality"] = "hifi"
-    settings["global"]["main_resolution"] = 2048
-    settings["global"]["search_limit"] = 10
-    
-    # Claves oficiales de OrpheusDL para nombres dinámicos de pistas y álbumes
-    settings["global"]["track_filename_format"] = "{track_number} - {artist} - {name}"
-    settings["global"]["album_format"] = "{album_artist}/{album}"
-    
-    # Forzar la incrustación de carátula en alta calidad
-    settings["global"]["embed_cover"] = True
-    settings["global"]["save_cover"] = True
-    settings["global"]["save_lyrics"] = True
 
     email = os.environ.get("KKBOX_EMAIL", "15cb1b133c@emailnox.live")
     password = os.environ.get("KKBOX_PASSWORD", "Mexico_2026")
     kc1_key = os.environ.get("KKBOX_KC1_KEY", "7f1a68f00b747f4ac1469c72e7ef492c")
     secret_key = os.environ.get("KKBOX_SECRET_KEY", "0ff29b7c9bd8fb60a3abd6b3d402b02c")
 
-    if "modules" not in settings:
-        settings["modules"] = {}
-
-    settings["modules"]["kkbox"] = {
-        "email": email,
-        "password": password,
-        "kc1_key": kc1_key,
-        "secret_key": secret_key
+    settings = {
+        "global": {
+            "download_path": task_download_dir,
+            "download_quality": "hifi",
+            "main_resolution": 2048,
+            "search_limit": 10,
+            "track_filename_format": "{track_number} - {artist} - {name}",
+            "album_format": "{album_artist}/{album}",
+            "embed_cover": True,
+            "save_cover": True,
+            "save_lyrics": True
+        },
+        "modules": {
+            "kkbox": {
+                "email": email,
+                "password": password,
+                "kc1_key": kc1_key,
+                "secret_key": secret_key
+            }
+        }
     }
 
     with open(config_path, 'w', encoding='utf-8') as f:
