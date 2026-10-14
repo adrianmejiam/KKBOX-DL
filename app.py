@@ -30,7 +30,7 @@ def ensure_orpheus_installed():
             print(f"Error al inicializar el entorno: {e}")
 
 def setup_orpheus_config(task_download_dir):
-    """Genera la configuración interna con las credenciales de KKBOX."""
+    """Genera la configuración interna con la estructura exacta exigida por OrpheusDL."""
     config_dir = os.path.join(ORPHEUS_DIR, 'config')
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, 'settings.json')
