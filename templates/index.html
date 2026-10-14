@@ -63,29 +63,18 @@
             <p class="text-xs text-gray-400 mb-3">☕ ¿Te sirvió la aplicación? Apoya la mantención del servidor:</p>
             
             <!-- Widget de Transferencia SPEI -->
-            <div class="bg-gray-900 border border-gray-700 p-3.5 rounded-lg mb-3 text-left space-y-2">
+            <div class="bg-gray-900 border border-gray-700 p-3.5 rounded-lg text-left space-y-2">
                 <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-indigo-400">Transferencia SPEI (México)</span>
                     <button onclick="copyClabe()" class="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded transition font-semibold">Copiar CLABE</button>
                 </div>
                 <div class="text-xs text-gray-300 space-y-1">
                     <div><span class="text-gray-500 font-semibold">Institución:</span> Mercado Pago W</div>
-                    <div><span class="text-gray-500 font-semibold">Beneficiario:</span> Pedro Adrian Mejia Muñoz</div>
                     <div>
                         <span class="text-gray-500 font-semibold">CLABE:</span> 
                         <span id="clabeText" class="font-mono text-indigo-300 font-bold select-all">722969010736762461</span>
                     </div>
                 </div>
-            </div>
-
-            <!-- Botones Externos Opcionales -->
-            <div class="flex justify-center space-x-3">
-                <a href="https://paypal.me/" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-gray-900 font-bold text-xs px-3 py-1.5 rounded transition duration-200">
-                    💳 PayPal
-                </a>
-                <a href="https://buymeacoffee.com/" target="_blank" class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold text-xs px-3 py-1.5 rounded transition duration-200">
-                    ☕ Buy Me a Coffee
-                </a>
             </div>
         </div>
     </div>
@@ -96,121 +85,4 @@
 
     <script>
         function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-
-        function copyClabe() {
-            const clabe = "722969010736762461";
-            navigator.clipboard.writeText(clabe).then(() => {
-                alert("¡CLABE copiada al portapapeles!");
-            }).catch(err => {
-                console.error("Error al copiar: ", err);
-            });
-        }
-
-        async function startDownload() {
-            const urlInput = document.getElementById('url').value.trim();
-            const btn = document.getElementById('downloadBtn');
-            const progressContainer = document.getElementById('progressContainer');
-            const progressBar = document.getElementById('progressBar');
-            const statusText = document.getElementById('statusText');
-            const percentText = document.getElementById('percentText');
-            const consoleBox = document.getElementById('consoleBox');
-            const autoDownload = document.getElementById('autoDownloadToggle').checked;
-            const manualDownloadContainer = document.getElementById('manualDownloadContainer');
-            const manualDownloadBtn = document.getElementById('manualDownloadBtn');
-
-            if (!urlInput) {
-                alert("Por favor ingresa una URL válida de KKBOX.");
-                return;
-            }
-
-            btn.disabled = true;
-            btn.classList.add('opacity-50');
-            progressContainer.classList.remove('hidden');
-            manualDownloadContainer.classList.add('hidden');
-            progressBar.style.width = '0%';
-            percentText.innerText = '0%';
-            statusText.innerText = 'Iniciando conexión...';
-            consoleBox.innerHTML = '<div class="text-indigo-400">[+] Conectando al servidor...</div>';
-
-            try {
-                const response = await fetch('/start-download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: urlInput })
-                });
-                const result = await response.json();
-                
-                if (result.error) {
-                    throw new Error(result.error);
-                }
-
-                if (result.task_id) {
-                    pollProgress(result.task_id);
-                }
-            } catch (err) {
-                console.error("Error:", err);
-                statusText.innerText = err.message || "Error de comunicación con el servidor.";
-                btn.disabled = false;
-                btn.classList.remove('opacity-50');
-            }
-        }
-
-        function pollProgress(taskId) {
-            const btn = document.getElementById('downloadBtn');
-            const progressBar = document.getElementById('progressBar');
-            const statusText = document.getElementById('statusText');
-            const percentText = document.getElementById('percentText');
-            const consoleBox = document.getElementById('consoleBox');
-            const autoDownload = document.getElementById('autoDownloadToggle').checked;
-            const manualDownloadContainer = document.getElementById('manualDownloadContainer');
-            const manualDownloadBtn = document.getElementById('manualDownloadBtn');
-
-            const interval = setInterval(async () => {
-                try {
-                    const res = await fetch(`/get-progress-json/${taskId}`);
-                    if (!res.ok) return;
-                    const data = await res.json();
-
-                    progressBar.style.width = `${data.progress}%`;
-                    percentText.innerText = `${data.progress}%`;
-                    statusText.innerText = data.status;
-
-                    if (data.logs && data.logs.length > 0) {
-                        consoleBox.innerHTML = data.logs.map(log => `<div>${escapeHtml(log)}</div>`).join('');
-                        consoleBox.scrollTop = consoleBox.scrollHeight;
-                    }
-
-                    if (data.progress >= 100 || data.error) {
-                        clearInterval(interval);
-                        btn.disabled = false;
-                        btn.classList.remove('opacity-50');
-
-                        if (data.download_url) {
-                            if (autoDownload) {
-                                consoleBox.innerHTML += '<div class="text-green-300 font-bold">[✔] ¡Descarga completada! Transfiriendo archivo al navegador...</div>';
-                                const link = document.createElement('a');
-                                link.href = data.download_url;
-                                link.setAttribute('download', '');
-                                document.body.appendChild(link);
-                                link.click();
-                                link.remove();
-                            } else {
-                                consoleBox.innerHTML += '<div class="text-green-300 font-bold">[✔] ¡Descarga completada! Presiona el botón de abajo para guardar.</div>';
-                                manualDownloadBtn.href = data.download_url;
-                                manualDownloadContainer.classList.remove('hidden');
-                            }
-                        } else if (data.error) {
-                            consoleBox.innerHTML += `<div class="text-red-400 font-bold">[✖] Error: ${escapeHtml(data.status)}</div>`;
-                        }
-                        consoleBox.scrollTop = consoleBox.scrollHeight;
-                    }
-                } catch (e) {
-                    console.error("Error en sondeo:", e);
-                }
-            }, 1500);
-        }
-    </script>
-</body>
-</html>
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;
