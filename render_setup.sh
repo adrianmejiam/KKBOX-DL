@@ -4,31 +4,38 @@ set -o errexit
 
 echo "=== Iniciando la preparación del entorno OrpheusDL + KKBOX ==="
 
-# 1. Clonar el framework base oficial de OrfiTeam usando la ruta explícita final
+# Instalar dependencias del sistema necesarias para procesar carátulas y audio (FFmpeg y librerías de imagen)
+echo "Instalando dependencias del sistema operativo..."
+apt-get update && apt-get install -y ffmpeg libjpeg-dev zlib1g-dev || echo "Aviso: No se pudieron instalar paquetes apt (puede no ser Debian/Ubuntu)."
+
+# 1. Clonar el framework base oficial de OrfiTeam
 if [ ! -d "orpheusdl" ]; then
     echo "Clonando framework base OrpheusDL desde OrfiTeam..."
     git clone "https://github.com/OrfiTeam/OrpheusDL.git" orpheusdl
 fi
 
-# 2. Clonar el módulo de KKBOX de uhwot usando la ruta explícita final
+# 2. Clonar el módulo de KKBOX de uhwot
 if [ ! -d "orpheusdl/modules/kkbox" ]; then
     echo "Instalando módulo KKBOX desde uhwot..."
-    git clone "https://github.com" orpheusdl/modules/kkbox
+    mkdir -p orpheusdl/modules
+    git clone "https://github.com/uhwot/orpheusdl-kkbox.git" orpheusdl/modules/kkbox
 fi
 
-# 3. Instalar todos los requerimientos base del sistema y Flask
+# 3. Instalar dependencias de Python
 echo "Instalando dependencias de Python..."
 pip install --upgrade pip
-pip install --prefer-binary -r orpheusdl/requirements.txt
-pip install --prefer-binary flask gunicorn gevent
+if [ -f "orpheusdl/requirements.txt" ]; then
+    pip install -r orpheusdl/requirements.txt
+fi
+pip install flask gunicorn mutagen yt-dlp Pillow
 
 # 4. Inicializar nativamente la base de configuración de OrpheusDL
 echo "Inicializando configuraciones base..."
 cd orpheusdl
-python orpheus.py settings refresh
+python3 orpheus.py settings refresh || true
 cd ..
 
-# 5. Inyectar los accesos y parámetros de desencripción en el settings.json
+# 5. Inyectar los accesos y parámetros en el settings.json
 echo "Escribiendo archivo de configuración config/settings.json..."
 mkdir -p orpheusdl/config
 
@@ -43,7 +50,10 @@ cat <<EOT > orpheusdl/config/settings.json
         "download_path": "../downloads/",
         "download_quality": "hifi",
         "main_resolution": 2048,
-        "search_limit": 10
+        "search_limit": 10,
+        "embed_cover": true,
+        "save_cover": true,
+        "save_lyrics": true
     },
     "modules": {
         "kkbox": {
@@ -55,3 +65,8 @@ cat <<EOT > orpheusdl/config/settings.json
     }
 }
 EOT
+
+# Crear el directorio físico de descargas
+mkdir -p downloads
+
+echo "=== Entorno preparado exitosamente ==="
